@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/openshift/openshift-controller-manager/pkg/route/ingressip"
+	"github.com/openshift/route-controller-manager/pkg/route/ingressip"
 )
 
 func RunIngressIPController(ctx *ControllerContext) (bool, error) {

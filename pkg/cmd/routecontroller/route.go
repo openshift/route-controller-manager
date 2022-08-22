@@ -16,7 +16,7 @@ import (
 
 	openshiftcontrolplanev1 "github.com/openshift/api/openshiftcontrolplane/v1"
 
-	routecontrollers "github.com/openshift/openshift-controller-manager/pkg/cmd/controller/route"
+	routecontrollers "github.com/openshift/route-controller-manager/pkg/cmd/controller/route"
 )
 
 func RunRouteControllerManager(config *openshiftcontrolplanev1.OpenShiftControllerManagerConfig, kubeClient kubernetes.Interface, clientConfig *rest.Config) (bool, error) {

@@ -5,7 +5,7 @@ import (
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 
 	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
-	"github.com/openshift/openshift-controller-manager/pkg/route/ingress"
+	"github.com/openshift/route-controller-manager/pkg/route/ingress"
 )
 
 func RunIngressToRouteController(ctx *ControllerContext) (bool, error) {
