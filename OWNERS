@@ -11,4 +11,4 @@ approvers:
   - mfojtik
   - soltysh
   - coreydaley
-component: openshift-controller-manager
+component: route-controller-manager
