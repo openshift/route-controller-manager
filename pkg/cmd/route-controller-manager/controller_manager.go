@@ -10,7 +10,7 @@ import (
 
 	routecontrollers "github.com/openshift/route-controller-manager/pkg/cmd/controller/route"
 	origincontrollers "github.com/openshift/route-controller-manager/pkg/cmd/routecontroller"
-	"github.com/openshift/route-controller-manager/pkg/routeversion"
+	"github.com/openshift/route-controller-manager/pkg/version"
 )
 
 func RunRouteControllerManager(config *openshiftcontrolplanev1.OpenShiftControllerManagerConfig, clientConfig *rest.Config) error {
@@ -22,7 +22,7 @@ func RunRouteControllerManager(config *openshiftcontrolplanev1.OpenShiftControll
 
 	// only serve if we have serving information.
 	if config.ServingInfo != nil {
-		klog.Infof("Starting controllers on %s (%s)", config.ServingInfo.BindAddress, routeversion.Get().String())
+		klog.Infof("Starting controllers on %s (%s)", config.ServingInfo.BindAddress, version.Get().String())
 
 		if err := routecontrollers.RunControllerServer(*config.ServingInfo, kubeClient); err != nil {
 			return err
