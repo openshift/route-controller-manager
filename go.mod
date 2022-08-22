@@ -1,4 +1,4 @@
-module github.com/openshift/openshift-controller-manager
+module github.com/openshift/route-controller-manager
 
 go 1.18
 

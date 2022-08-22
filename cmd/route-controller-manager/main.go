@@ -9,8 +9,8 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/cli"
 
-	route_controller_manager "github.com/openshift/openshift-controller-manager/pkg/cmd/route-controller-manager"
-	"github.com/openshift/openshift-controller-manager/pkg/routeversion"
+	route_controller_manager "github.com/openshift/route-controller-manager/pkg/cmd/route-controller-manager"
+	"github.com/openshift/route-controller-manager/pkg/routeversion"
 )
 
 func main() {

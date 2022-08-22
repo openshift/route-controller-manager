@@ -8,9 +8,9 @@ import (
 	openshiftcontrolplanev1 "github.com/openshift/api/openshiftcontrolplane/v1"
 	"github.com/openshift/library-go/pkg/serviceability"
 
-	routecontrollers "github.com/openshift/openshift-controller-manager/pkg/cmd/controller/route"
-	origincontrollers "github.com/openshift/openshift-controller-manager/pkg/cmd/routecontroller"
-	"github.com/openshift/openshift-controller-manager/pkg/routeversion"
+	routecontrollers "github.com/openshift/route-controller-manager/pkg/cmd/controller/route"
+	origincontrollers "github.com/openshift/route-controller-manager/pkg/cmd/routecontroller"
+	"github.com/openshift/route-controller-manager/pkg/routeversion"
 )
 
 func RunRouteControllerManager(config *openshiftcontrolplanev1.OpenShiftControllerManagerConfig, clientConfig *rest.Config) error {
