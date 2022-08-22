@@ -1,4 +1,4 @@
-/openshift-controller-manager
+/route-controller-manager
 .vscode/
 .idea/
 vendor/github.com/prometheus/client_model/.classpath
