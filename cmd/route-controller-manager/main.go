@@ -31,7 +31,7 @@ func main() {
 func NewRouteControllerManagerCommand(stopCh <-chan struct{}) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "route-controller-manager",
-		Short: "Command for additional management of ingress and Route resources",
+		Short: "Test Command for additional management of ingress and Route resources",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 			os.Exit(1)
