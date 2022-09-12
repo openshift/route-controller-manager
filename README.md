@@ -1,28 +1,19 @@
-# OpenShift Controller Manager
+# Route Controller Manager
 
-The OpenShift Controller Manager (OCM) is comprised of multiple controllers, many of which
-correspond to a top-level OpenShift API object, watching for changes and acting accordingly.
-The controllers are generally organized by API group:
+The Route Controller Manager consists of additional controllers that enhance Openshift Routes, Ingresses, and Services.
 
-- `apps.openshift.io` - OpenShift-specific workloads, like `DeploymentConfig`.
-- `build.openshift.io` - OpenShift `Builds` and `BuildConfigs`.
-- `image.openshift.io` - `ImageStreams` and `Images`.
-- `project.openshift.io` - Projects, OpenShift's wrapper for `Namespaces`.
-- `route.openshift.io` - OpenShift `Routes`, which provide similar capability to upstream `Ingress`
-  objects.
-- `template.openshift.io` - OpenShift `Templates` - a simple way to deploy applications.
+## Ingress to Route Controller
 
-There are additional controllers which add OpenShift-specific capabilities to the cluster:
+Controller ensures that zero or more routes exist to match any supported ingress. The
+controller creates a controller owner reference from the route to the parent ingress,
+allowing users to orphan their ingress. All owned routes have specific spec fields
+managed (those attributes present on the ingress), while any other fields may be
+modified by the user.
 
-- `authorization` - provides default service account role bindings for OpenShift projects.
-- `serviceaccounts` - manages secrets that allow images to be pulled and pushed from the
-  [OpenShift image registry](https://github.com/openshift/image-registry).
-- `unidling` - manages unidling of applications when inbound network traffic is detected. See the
-  [OpenShift docs](https://docs.openshift.com/container-platform/latest/applications/idling-applications.html#idle-unidling-applications_idling-applications)
-  for more information.
 
-## Metrics
+## Service Ingress IP Controller
 
-Many of the controllers expose metrics which are visible in the default OpenShift monitoring system
-(Prometheus). See [metrics](docs/metrics.md) for a detailed list of exposed metrics for each API
-group.
+Controller is responsible for allocating ingress ip addresses to Service objects of type LoadBalancer. 
+It allocates adresses from `spec.observedConfig.ingress.ingressIPNetworkCIDR` range in
+`openshiftcontrollermanagers.operator.openshift.io cluster` config and can be used to assign a unique external IP addresses.
+
