@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"runtime"
 
@@ -14,7 +15,7 @@ import (
 )
 
 func main() {
-	stopCh := genericapiserver.SetupSignalHandler()
+	ctx := genericapiserver.SetupSignalContext()
 
 	defer serviceability.BehaviorOnPanic(os.Getenv("OPENSHIFT_ON_PANIC"), version.Get())()
 	defer serviceability.Profile(os.Getenv("OPENSHIFT_PROFILE")).Stop()
@@ -23,12 +24,12 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	command := NewRouteControllerManagerCommand(stopCh)
+	command := NewRouteControllerManagerCommand(ctx)
 	code := cli.Run(command)
 	os.Exit(code)
 }
 
-func NewRouteControllerManagerCommand(stopCh <-chan struct{}) *cobra.Command {
+func NewRouteControllerManagerCommand(ctx context.Context) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "route-controller-manager",
 		Short: "Command for additional management of ingress and Route resources",
@@ -37,7 +38,7 @@ func NewRouteControllerManagerCommand(stopCh <-chan struct{}) *cobra.Command {
 			os.Exit(1)
 		},
 	}
-	start := route_controller_manager.NewRouteControllerManagerCommand("start", os.Stdout, os.Stderr, stopCh)
+	start := route_controller_manager.NewRouteControllerManagerCommand("start", os.Stdout, os.Stderr, ctx)
 	cmd.AddCommand(start)
 
 	return cmd
