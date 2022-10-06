@@ -3,7 +3,6 @@ module github.com/openshift/route-controller-manager
 go 1.19
 
 require (
-	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
 	github.com/openshift/api v0.0.0-20221004161420-ef2c62cf20d0
 	github.com/openshift/build-machinery-go v0.0.0-20220913142420-e25cf57ea46d
 	github.com/openshift/client-go v0.0.0-20220915152853-9dfefb19db2e
