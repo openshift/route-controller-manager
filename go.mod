@@ -1,6 +1,6 @@
 module github.com/openshift/route-controller-manager
 
-go 1.18
+go 1.19
 
 require (
 	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
