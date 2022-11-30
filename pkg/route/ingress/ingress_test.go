@@ -883,6 +883,7 @@ func TestController_sync(t *testing.T) {
 						Host: "test.com",
 						Path: "/deep",
 						To: routev1.RouteTargetReference{
+							Kind: "Service",
 							Name: "service-1",
 						},
 						Port: &routev1.RoutePort{
@@ -900,6 +901,7 @@ func TestController_sync(t *testing.T) {
 						Host: "test.com",
 						Path: "/",
 						To: routev1.RouteTargetReference{
+							Kind: "Service",
 							Name: "service-1",
 						},
 						Port: &routev1.RoutePort{
@@ -971,6 +973,7 @@ func TestController_sync(t *testing.T) {
 						Host: "test.com",
 						Path: "/",
 						To: routev1.RouteTargetReference{
+							Kind: "Service",
 							Name: "service-1",
 						},
 						Port: &routev1.RoutePort{
@@ -1038,6 +1041,7 @@ func TestController_sync(t *testing.T) {
 						Host: "test.com",
 						Path: "/",
 						To: routev1.RouteTargetReference{
+							Kind: "Service",
 							Name: "service-2",
 						},
 						Port: &routev1.RoutePort{
@@ -1111,6 +1115,7 @@ func TestController_sync(t *testing.T) {
 					Spec: routev1.RouteSpec{
 						Host: "test.com",
 						To: routev1.RouteTargetReference{
+							Kind: "Service",
 							Name: "service-1",
 						},
 						Port: &routev1.RoutePort{
@@ -1184,6 +1189,7 @@ func TestController_sync(t *testing.T) {
 					Spec: routev1.RouteSpec{
 						Host: "test.com",
 						To: routev1.RouteTargetReference{
+							Kind: "Service",
 							Name: "service-1",
 						},
 						Port: &routev1.RoutePort{
@@ -1300,6 +1306,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1314,7 +1321,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -1365,6 +1372,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1425,6 +1433,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1453,6 +1462,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1513,6 +1523,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/bar",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1588,6 +1599,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1667,6 +1679,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1734,6 +1747,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1801,6 +1815,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1821,7 +1836,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -1872,6 +1887,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1886,7 +1902,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -1940,6 +1956,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -1954,7 +1971,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"edge","certificate":"cert","key":"key","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"edge","certificate":"cert","key":"key","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -2017,6 +2034,7 @@ func TestController_sync(t *testing.T) {
 								InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2031,7 +2049,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"passthrough"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"passthrough"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -2094,6 +2112,7 @@ func TestController_sync(t *testing.T) {
 								InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2108,7 +2127,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"reencrypt","certificate":"cert","key":"key","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"reencrypt"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"reencrypt","certificate":"cert","key":"key","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"reencrypt"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -2168,6 +2187,7 @@ func TestController_sync(t *testing.T) {
 								InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2182,7 +2202,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"reencrypt","insecureEdgeTerminationPolicy":"Redirect"}}},` + `{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"reencrypt"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"reencrypt","insecureEdgeTerminationPolicy":"Redirect"}}},` + `{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"reencrypt"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -2243,6 +2263,7 @@ func TestController_sync(t *testing.T) {
 								InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2260,7 +2281,7 @@ func TestController_sync(t *testing.T) {
 					Patch: []byte(
 						strings.Join(
 							[]string{
-								`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"reencrypt","destinationCACertificate":"CAcert","insecureEdgeTerminationPolicy":"Redirect"}}}`,
+								`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"reencrypt","destinationCACertificate":"CAcert","insecureEdgeTerminationPolicy":"Redirect"}}}`,
 								`{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/destination-ca-certificate-secret":"secret-ca-cert","route.openshift.io/termination":"reencrypt"}}`,
 								`{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`,
 							},
@@ -2331,6 +2352,7 @@ func TestController_sync(t *testing.T) {
 								DestinationCACertificate:      "CACert",
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2348,7 +2370,7 @@ func TestController_sync(t *testing.T) {
 					Patch: []byte(
 						strings.Join(
 							[]string{
-								`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"edge","insecureEdgeTerminationPolicy":"Redirect"}}}`,
+								`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"edge","insecureEdgeTerminationPolicy":"Redirect"}}}`,
 								`{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"edge"}}`,
 								`{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`,
 							},
@@ -2420,6 +2442,7 @@ func TestController_sync(t *testing.T) {
 								InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2437,7 +2460,7 @@ func TestController_sync(t *testing.T) {
 					Patch: []byte(
 						strings.Join(
 							[]string{
-								`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"reencrypt","destinationCACertificate":"CAcert-from-opaque","insecureEdgeTerminationPolicy":"Redirect"}}}`,
+								`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"reencrypt","destinationCACertificate":"CAcert-from-opaque","insecureEdgeTerminationPolicy":"Redirect"}}}`,
 								`{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/destination-ca-certificate-secret":"secret-ca-cert-opaque","route.openshift.io/termination":"reencrypt"}}`,
 								`{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`,
 							},
@@ -2507,6 +2530,7 @@ func TestController_sync(t *testing.T) {
 								InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2575,6 +2599,7 @@ func TestController_sync(t *testing.T) {
 								InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2589,7 +2614,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"}}},` + `{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"Passthrough"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},` + `{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/termination":"Passthrough"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -2641,6 +2666,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2655,7 +2681,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"edge","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"edge","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -2709,6 +2735,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2728,7 +2755,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"edge","certificate":"cert","key":"key2"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"edge","certificate":"cert","key":"key2"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -2782,6 +2809,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2850,6 +2878,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -2925,6 +2954,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3001,6 +3031,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3102,6 +3133,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3205,6 +3237,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3282,6 +3315,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3361,6 +3395,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3467,6 +3502,7 @@ func TestController_sync(t *testing.T) {
 							Host: "test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3591,6 +3627,7 @@ func TestController_sync(t *testing.T) {
 								InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 							},
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3605,7 +3642,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":{"haproxy.router.openshift.io/timeout":"6m","route.openshift.io/termination":"passthrough"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"tls":{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}}},{"op":"replace","path":"/metadata/annotations","value":{"haproxy.router.openshift.io/timeout":"6m","route.openshift.io/termination":"passthrough"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
@@ -3658,6 +3695,7 @@ func TestController_sync(t *testing.T) {
 						Host: "wildcard.test.com",
 						Path: "/",
 						To: routev1.RouteTargetReference{
+							Kind: "Service",
 							Name: "service-2",
 						},
 						Port: &routev1.RoutePort{
@@ -3726,6 +3764,7 @@ func TestController_sync(t *testing.T) {
 							Certificate:                   "cert",
 						},
 						To: routev1.RouteTargetReference{
+							Kind: "Service",
 							Name: "service-1",
 						},
 						Port: &routev1.RoutePort{
@@ -3781,6 +3820,7 @@ func TestController_sync(t *testing.T) {
 							Host: "wildcard.test.com",
 							Path: "/",
 							To: routev1.RouteTargetReference{
+								Kind: "Service",
 								Name: "service-1",
 							},
 							Port: &routev1.RoutePort{
@@ -3795,7 +3835,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"wildcard.test.com","path":"/","to":{"kind":"","name":"service-1","weight":null},"port":{"targetPort":"http"},"wildcardPolicy":"Subdomain"}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"wildcard.test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"},"wildcardPolicy":"Subdomain"}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
