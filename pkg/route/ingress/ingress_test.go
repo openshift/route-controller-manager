@@ -1577,8 +1577,8 @@ func TestController_sync(t *testing.T) {
 							},
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{
 									{Hostname: "apps.foo.com"},
 								},
 							},
@@ -2935,8 +2935,8 @@ func TestController_sync(t *testing.T) {
 							},
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{
 									{Hostname: "apps.foo.com"},
 								},
 							},
@@ -3068,8 +3068,8 @@ func TestController_sync(t *testing.T) {
 							Namespace: "test",
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{{
 									Hostname: "apps.foo.com",
 								}},
 							},
@@ -3114,8 +3114,8 @@ func TestController_sync(t *testing.T) {
 							},
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{
 									{Hostname: "apps.foo.com"},
 								},
 							},
@@ -3170,8 +3170,8 @@ func TestController_sync(t *testing.T) {
 							Namespace: "test",
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{
 									{Hostname: "apps.bar.com"},
 									{Hostname: "apps.foo.com"},
 								},
@@ -3217,8 +3217,8 @@ func TestController_sync(t *testing.T) {
 							},
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{
 									{Hostname: "apps.foo.com"},
 									{Hostname: "apps.bar.com"},
 								},
@@ -3375,8 +3375,8 @@ func TestController_sync(t *testing.T) {
 							},
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{
 									{Hostname: "apps.foo.com"},
 									{Hostname: "apps.bar.com"},
 								},
@@ -3435,8 +3435,8 @@ func TestController_sync(t *testing.T) {
 							Namespace: "test",
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{
 									{Hostname: "apps.bar.com"},
 								},
 							},
@@ -3483,8 +3483,8 @@ func TestController_sync(t *testing.T) {
 							},
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{
 									{Hostname: "apps.foo.com"},
 								},
 							},
@@ -3542,8 +3542,8 @@ func TestController_sync(t *testing.T) {
 							Namespace: "test",
 						},
 						Status: networkingv1.IngressStatus{
-							LoadBalancer: v1.LoadBalancerStatus{
-								Ingress: []v1.LoadBalancerIngress{},
+							LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+								Ingress: []networkingv1.IngressLoadBalancerIngress{},
 							},
 						},
 					},
