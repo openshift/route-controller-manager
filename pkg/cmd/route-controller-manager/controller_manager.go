@@ -5,8 +5,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-
-	routecontrollers "github.com/openshift/route-controller-manager/pkg/cmd/controller/route"
+	"github.com/openshift/route-controller-manager/pkg/cmd/controller"
 )
 
 func RunRouteControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
@@ -15,7 +14,7 @@ func RunRouteControllerManager(ctx context.Context, controllerContext *controlle
 		return err
 	}
 
-	routeControllerManagerContext, err := routecontrollers.NewControllerContext(ctx, controllerContext, *config)
+	routeControllerManagerContext, err := controller.NewControllerContext(ctx, controllerContext, *config)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -28,8 +27,8 @@ func RunRouteControllerManager(ctx context.Context, controllerContext *controlle
 	return nil
 }
 
-func startControllers(ctx context.Context, controllerContext *routecontrollers.EnhancedControllerContext) error {
-	for controllerName, initFn := range routecontrollers.ControllerManagerInitialization {
+func startControllers(ctx context.Context, controllerContext *controller.EnhancedControllerContext) error {
+	for controllerName, initFn := range controller.ControllerManagerInitialization {
 		if !controllerContext.IsControllerEnabled(controllerName) {
 			klog.Warningf("%q is disabled", controllerName)
 			continue

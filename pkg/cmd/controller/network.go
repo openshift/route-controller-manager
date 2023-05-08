@@ -1,4 +1,4 @@
-package route
+package controller
 
 import (
 	"context"

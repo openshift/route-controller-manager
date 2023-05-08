@@ -1,4 +1,4 @@
-package route
+package controller
 
 var ControllerManagerInitialization = map[string]InitFunc{
 	"openshift.io/ingress-ip":       RunIngressIPController,
