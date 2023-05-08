@@ -1,6 +1,8 @@
 package route
 
 import (
+	"context"
+
 	"fmt"
 	"net"
 	"time"
@@ -8,15 +10,15 @@ import (
 	"github.com/openshift/route-controller-manager/pkg/route/ingressip"
 )
 
-func RunIngressIPController(ctx *ControllerContext) (bool, error) {
+func RunIngressIPController(ctx context.Context, controllerContext *EnhancedControllerContext) (bool, error) {
 	// TODO configurable?
 	resyncPeriod := 10 * time.Minute
 
-	if len(ctx.OpenshiftControllerConfig.Ingress.IngressIPNetworkCIDR) == 0 {
+	if len(controllerContext.OpenshiftControllerConfig.Ingress.IngressIPNetworkCIDR) == 0 {
 		return true, nil
 	}
 
-	_, ipNet, err := net.ParseCIDR(ctx.OpenshiftControllerConfig.Ingress.IngressIPNetworkCIDR)
+	_, ipNet, err := net.ParseCIDR(controllerContext.OpenshiftControllerConfig.Ingress.IngressIPNetworkCIDR)
 	if err != nil {
 		return false, fmt.Errorf("unable to start ingress IP controller: %v", err)
 	}
@@ -27,12 +29,12 @@ func RunIngressIPController(ctx *ControllerContext) (bool, error) {
 	}
 
 	ingressIPController := ingressip.NewIngressIPController(
-		ctx.KubernetesInformers.Core().V1().Services().Informer(),
-		ctx.ClientBuilder.ClientOrDie(infraServiceIngressIPControllerServiceAccountName),
+		controllerContext.KubernetesInformers.Core().V1().Services().Informer(),
+		controllerContext.ClientBuilder.ClientOrDie(infraServiceIngressIPControllerServiceAccountName),
 		ipNet,
 		resyncPeriod,
 	)
-	go ingressIPController.Run(ctx.Stop)
+	go ingressIPController.Run(ctx.Done())
 
 	return true, nil
 }
