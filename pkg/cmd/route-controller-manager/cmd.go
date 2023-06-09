@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	podNameEnv = "POD_NAME"
+	podNameEnv      = "POD_NAME"
+	podNamespaceEnv = "POD_NAMESPACE"
 )
 
 func NewRouteControllerManagerCommand(name string) *cobra.Command {
@@ -34,6 +35,9 @@ func NewRouteControllerManagerCommand(name string) *cobra.Command {
 func getNamespace() string {
 	if nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
 		return string(nsBytes)
+	}
+	if podNamespace := os.Getenv(podNamespaceEnv); len(podNamespace) > 0 {
+		return podNamespace
 	}
 	return "openshift-route-controller-manager"
 }
