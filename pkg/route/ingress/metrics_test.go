@@ -58,7 +58,7 @@ func TestMetrics(t *testing.T) {
 			},
 			ingressclassLister: &ingressclassLister{},
 			routeLister:        &routeLister{},
-			expectedResponse:   "openshift_ingress_to_route_controller_ingress_without_class_name{name=\"nil-ingressclassname\"} 1",
+			expectedResponse:   "openshift_ingress_to_route_controller_ingress_without_class_name{name=\"nil-ingressclassname\",namespace=\"test\"} 1",
 		},
 		{
 			name: "Ingress with empty IngressClassName should return 1",
@@ -75,7 +75,7 @@ func TestMetrics(t *testing.T) {
 			},
 			ingressclassLister: &ingressclassLister{},
 			routeLister:        &routeLister{},
-			expectedResponse:   "openshift_ingress_to_route_controller_ingress_without_class_name{name=\"empty-ingressclassname\"} 1",
+			expectedResponse:   "openshift_ingress_to_route_controller_ingress_without_class_name{name=\"empty-ingressclassname\",namespace=\"test\"} 1",
 		},
 		{
 			name: "Ingress with empty string IngressClassName should return 1",
@@ -94,7 +94,7 @@ func TestMetrics(t *testing.T) {
 			},
 			ingressclassLister: &ingressclassLister{},
 			routeLister:        &routeLister{},
-			expectedResponse:   "openshift_ingress_to_route_controller_ingress_without_class_name{name=\"emptystring-ingressclassname\"} 1",
+			expectedResponse:   "openshift_ingress_to_route_controller_ingress_without_class_name{name=\"emptystring-ingressclassname\",namespace=\"test\"} 1",
 		},
 		{
 			name: "Ingress with set IngressClassName should return 0",
@@ -113,7 +113,7 @@ func TestMetrics(t *testing.T) {
 			},
 			ingressclassLister: &ingressclassLister{},
 			routeLister:        &routeLister{},
-			expectedResponse:   "openshift_ingress_to_route_controller_ingress_without_class_name{name=\"set-ingressclassname\"} 0",
+			expectedResponse:   "openshift_ingress_to_route_controller_ingress_without_class_name{name=\"set-ingressclassname\",namespace=\"test\"} 0",
 		},
 		{
 			name: "Route with an unmanaged Ingress owner should return 1",
