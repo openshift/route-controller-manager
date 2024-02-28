@@ -1,11 +1,22 @@
 reviewers:
-  - bparees
-  - mfojtik
-  - soltysh
-  - csrwng
-  - gabemontero
-  - adambkaplan
+  - knobunc
+  - Miciah
+  - frobware
+  - miheer
+  - candita
+  - rfredette
+  - alebedev87
+  - gcs278
 approvers:
+  - knobunc
+  - Miciah
+  - frobware
+  - miheer
+  - candita
+  - rfredette
+  - alebedev87
+  - gcs278
+emeritus_approvers:
   - bparees
   - mfojtik
   - soltysh
