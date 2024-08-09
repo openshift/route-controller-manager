@@ -340,6 +340,13 @@ func (ic *IngressIPController) recordLocalAllocation(key, ipString string) (real
 	}
 	ic.allocationMap[ipString] = key
 	klog.V(5).Infof("Recorded allocation of ip %v for service %v", ipString, key)
+	ic.recorder.Eventf(&v1.Service{}, v1.EventTypeNormal, "IPAllocated", "Successfully allocated IP %v for service %v", ipString, key)
+
+	if err != nil {
+		klog.Errorf("Failed to allocate IP for service %v: %v", key, err)
+		ic.recorder.Eventf(&v1.Service{}, v1.EventTypeWarning, "IPAllocationFailed", "Failed to allocate IP for service %v: %v", key, err)
+		return false, err
+	}
 	return false, nil
 }
 
