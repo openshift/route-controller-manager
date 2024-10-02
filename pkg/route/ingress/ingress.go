@@ -354,6 +354,13 @@ func (c *Controller) handleNamespaceErr(err error, key interface{}) {
 
 	klog.V(4).Infof("Error syncing %v: %v", key, err)
 	c.queue.AddRateLimited(key)
+
+	// Emit an event for the failed ingress to route conversion
+	c.eventRecorder.Eventf(&corev1.ObjectReference{
+		Kind:      "Ingress",
+		Namespace: key.(queueKey).namespace,
+		Name:      key.(queueKey).name,
+	}, corev1.EventTypeWarning, "FailedIngressToRouteConversion", "Error in converting Ingress to Route: %v", err)
 }
 
 func (c *Controller) sync(key queueKey) error {
