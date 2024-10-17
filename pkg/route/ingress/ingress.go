@@ -362,7 +362,24 @@ func (c *Controller) handleNamespaceErr(err error, key interface{}) {
 		Name:      key.(queueKey).name,
 	}, corev1.EventTypeWarning, "FailedIngressToRouteConversion", "Error in converting Ingress to Route: %v", err)
 }
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
 
+var nonConformingRules []string
+
+func (c *Controller) emitSummaryEvent(nonConformingRules []string, ingress *networkingv1.Ingress) {
+	if len(nonConformingRules) == 0 {
+		return
+	}
+	message := "Non-conforming rules detected: " + strings.Join(nonConformingRules, "; ")
+	c.eventRecorder.Eventf(ingress, corev1.EventTypeWarning, "NonConformingIngressRules", message)
+}
 func (c *Controller) sync(key queueKey) error {
 	// sync all ingresses in the namespace
 	if len(key.name) == 0 {
@@ -417,9 +434,15 @@ func (c *Controller) sync(key queueKey) error {
 	var creates, updates, matches []*routev1.Route
 	for _, rule := range ingress.Spec.Rules {
 		if rule.HTTP == nil {
+			if !contains(nonConformingRules, "Missing HTTP field in rule") {
+				nonConformingRules = append(nonConformingRules, "Missing HTTP field in rule")
+			}
 			continue
 		}
 		if len(rule.Host) == 0 {
+			if !contains(nonConformingRules, "Missing host field in rule") {
+				nonConformingRules = append(nonConformingRules, "Missing host field in rule")
+			}
 			continue
 		}
 		host := rule.Host
@@ -430,14 +453,23 @@ func (c *Controller) sync(key queueKey) error {
 		}
 		for _, path := range rule.HTTP.Paths {
 			if path.Backend.Service == nil {
-				// Non-Service backends are not implemented.
+				if !contains(nonConformingRules, "Non-service backends are not implemented") {
+					nonConformingRules = append(nonConformingRules, "Non-service backends are not implemented")
+					// Non-Service backends are not implemented.
+				}
 				continue
 			}
 			if len(path.Backend.Service.Name) == 0 {
+				if !contains(nonConformingRules, "Service name is missing") {
+					nonConformingRules = append(nonConformingRules, "Service name is missing")
+				}
 				continue
 			}
 			if path.PathType != nil && *path.PathType == networkingv1.PathTypeExact {
-				// Exact path type is not implemented.
+				if !contains(nonConformingRules, "Exact path type is not implemented") {
+					nonConformingRules = append(nonConformingRules, "Exact path type is not implemented")
+					// Exact path type is not implemented.
+				}
 				continue
 			}
 
@@ -466,6 +498,10 @@ func (c *Controller) sync(key queueKey) error {
 		}
 	}
 
+	if len(creates) == 0 && len(updates) == 0 && len(old) == 0 && len(nonConformingRules) > 0 {
+		message := "Non-conforming rules detected: " + strings.Join(nonConformingRules, "; ")
+		c.eventRecorder.Eventf(ingress, corev1.EventTypeWarning, "NonConformingIngressRules", message)
+	}
 	var errs []error
 	// add the new routes
 	for _, route := range creates {
@@ -699,18 +735,30 @@ func routeMatchesIngress(
 
 	targetPort, err := targetPortForService(ingress.Namespace, path.Backend.Service, serviceLister)
 	if err != nil {
-		// not valid
+		if !contains(nonConformingRules, "No valid target port") {
+			nonConformingRules = append(nonConformingRules, "No valid target port")
+			// not valid
+		}
 		return false
 	}
 	if targetPort == nil && route.Spec.Port != nil {
+		if !contains(nonConformingRules, "Route specifies a port but the service has no port") {
+			nonConformingRules = append(nonConformingRules, "Route specifies a port but the service has no port")
+		}
 		return false
 	}
 	if targetPort != nil && (route.Spec.Port == nil || *targetPort != route.Spec.Port.TargetPort) {
+		if !contains(nonConformingRules, "Service target port does not match route target port") {
+			nonConformingRules = append(nonConformingRules, "Service target port does not match route target port")
+		}
 		return false
 	}
 
 	tlsConfig, hasInvalidSecret := tlsConfigForIngress(ingress, rule, secretLister)
 	if hasInvalidSecret {
+		if !contains(nonConformingRules, "Invalid or missing TLS secret") {
+			nonConformingRules = append(nonConformingRules, "Invalid or missing TLS secret")
+		}
 		return false
 	}
 
