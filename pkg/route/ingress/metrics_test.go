@@ -213,6 +213,11 @@ func TestMetrics(t *testing.T) {
 		routeLister:        &r,
 	}
 	legacyregistry.MustRegister(c)
+	t.Cleanup(func() {
+		// Unregister the collector when this test is done so that
+		// subsequent tests can register it.
+		legacyregistry.Registerer().Unregister(c)
+	})
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -230,4 +235,67 @@ func TestMetrics(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_ResetIngressMetrics(t *testing.T) {
+	ingress := func(namespace, name string, ingressClassName *string) *networkingv1.Ingress {
+		return &networkingv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+			},
+			Spec: networkingv1.IngressSpec{
+				IngressClassName: ingressClassName,
+			},
+		}
+	}
+	defaultIngressClassName := "openshift-default"
+	i1 := ingress("test", "ingress1", &defaultIngressClassName)
+	i2 := ingress("test", "ingress2", nil)
+	i3 := ingress("test", "ingress3", nil)
+	c := &Controller{
+		ingressLister: &ingressLister{
+			Items: []*networkingv1.Ingress{i1, i2, i3},
+		},
+		ingressclassLister: &ingressclassLister{
+			Items: []*networkingv1.IngressClass{},
+		},
+		routeLister: &routeLister{},
+	}
+	legacyregistry.MustRegister(c)
+	t.Cleanup(func() {
+		// Unregister the collector when this test is done so that
+		// subsequent tests can register it.
+		legacyregistry.Registerer().Unregister(c)
+	})
+
+	assertMetrics := func(t *testing.T, expectedResponse string) {
+		h := promhttp.HandlerFor(legacyregistry.DefaultGatherer, promhttp.HandlerOpts{ErrorHandling: promhttp.HTTPErrorOnError})
+
+		rw := &fakeResponseWriter{header: http.Header{}}
+		h.ServeHTTP(rw, &http.Request{})
+
+		respStr := rw.String()
+		if !strings.Contains(respStr, expectedResponse) {
+			t.Fatalf("expected string did not appear in response\nexpected:\n%s\n\nresponse:\n %s", expectedResponse, respStr)
+		}
+	}
+
+	t.Log("Initially, ingress1 has openshift-default, ingress2 has null, ingress3 has null.")
+
+	assertMetrics(t,
+		`openshift_ingress_to_route_controller_ingress_without_class_name{name="ingress1",namespace="test"} 0`+"\n"+
+			`openshift_ingress_to_route_controller_ingress_without_class_name{name="ingress2",namespace="test"} 1`+"\n"+
+			`openshift_ingress_to_route_controller_ingress_without_class_name{name="ingress3",namespace="test"} 1`+"\n")
+
+	t.Log("Simulate deletion of ingress2 and update of ingress3.")
+
+	c.ingressLister = &ingressLister{Items: []*networkingv1.Ingress{i1, i3}}
+	c.ResetIngressMetrics(i2.Namespace, i2.Name)
+	i3.Spec.IngressClassName = &defaultIngressClassName
+
+	assertMetrics(t,
+		`openshift_ingress_to_route_controller_ingress_without_class_name{name="ingress1",namespace="test"} 0`+"\n"+
+			`openshift_ingress_to_route_controller_ingress_without_class_name{name="ingress2",namespace="test"} 0`+"\n"+
+			`openshift_ingress_to_route_controller_ingress_without_class_name{name="ingress3",namespace="test"} 0`+"\n")
 }
