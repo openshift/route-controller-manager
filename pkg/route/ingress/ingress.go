@@ -360,7 +360,7 @@ func (c *Controller) handleNamespaceErr(err error, key interface{}) {
 		Kind:      "Ingress",
 		Namespace: key.(queueKey).namespace,
 		Name:      key.(queueKey).name,
-	}, corev1.EventTypeNormal, "FailedIngressToRouteConversion", "Error in converting Ingress to Route: %v", err)
+	}, corev1.EventTypeWarning, "FailedIngressToRouteConversion", "Error in converting Ingress to Route: %v", err)
 }
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
@@ -373,7 +373,7 @@ func contains(slice []string, item string) bool {
 
 func (c *Controller) sync(key queueKey) error {
 	// sync all ingresses in the namespace
-	var ingressToRouteRule []string
+	var incompleteIngressToRouteRules []string
 	if len(key.name) == 0 {
 		ingresses, err := c.ingressLister.Ingresses(key.namespace).List(labels.Everything())
 		if err != nil {
@@ -427,12 +427,12 @@ func (c *Controller) sync(key queueKey) error {
 	var creates, updates, matches []*routev1.Route
 	for i, rule := range ingress.Spec.Rules {
 		if rule.HTTP == nil {
-			ingressToRouteRule = append(ingressToRouteRule, fmt.Sprintf("Missing http field in rule at index %d", i))
+			incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("Missing http field in rule at index %d", i))
 			continue
 		}
 
 		if len(rule.Host) == 0 {
-			ingressToRouteRule = append(ingressToRouteRule, fmt.Sprintf("Missing host field in rule at index %d", i))
+			incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("Missing host field in rule at index %d", i))
 			continue
 		}
 		host := rule.Host
@@ -443,19 +443,16 @@ func (c *Controller) sync(key queueKey) error {
 		}
 		for j, path := range rule.HTTP.Paths {
 			if path.Backend.Service == nil {
-				ingressToRouteRule = append(ingressToRouteRule, fmt.Sprintf("Missing non-service backends in rule at index %d, path index %d", i, j))
-				// Non-Service backends are not implemented.
+				incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("Missing backend service field in rule at index %d, path index %d", i, j)) // Non-Service backends are not implemented.
 				continue
 			}
 			if len(path.Backend.Service.Name) == 0 {
-				ingressToRouteRule = append(ingressToRouteRule, fmt.Sprintf("Missing service name in rule at index %d path index %d", i, j))
+				incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("Missing backend service name in rule at index %d, path index %d", i, j))
 				continue
 			}
 			if path.PathType != nil && *path.PathType == networkingv1.PathTypeExact {
-				if !contains(ingressToRouteRule, "Missing exact path type in rule at index") {
-					ingressToRouteRule = append(ingressToRouteRule, fmt.Sprintf("Missing exact path type in rule at index %d path index %d", i, j))
-					// Exact path type is not implemented.
-				}
+				// Exact path type is not implemented.
+				incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("Unsupported exact path type in rule at index %d, path index %d", i, j))
 				continue
 			}
 
@@ -468,7 +465,8 @@ func (c *Controller) sync(key queueKey) error {
 				continue
 			}
 
-			_, match := routeMatchesIngress(existing, ingress, &rule, &path, c.secretLister, c.serviceLister, host, hostIsWildcard, ingressToRouteRule)
+			match, incompleteMatchRules := routeMatchesIngress(existing, ingress, &rule, &path, c.secretLister, c.serviceLister, host, hostIsWildcard)
+			incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, incompleteMatchRules...)
 			if match {
 				matches = append(matches, existing)
 				continue
@@ -572,8 +570,8 @@ func (c *Controller) sync(key queueKey) error {
 			errs = append(errs, err)
 		}
 	}
-	if len(errs) == 0 && len(ingressToRouteRule) > 0 {
-		c.eventRecorder.Eventf(ingress, corev1.EventTypeNormal, "IngressToRouteRule", "Incomplete ingress to route rules detected: %s", strings.Join(ingressToRouteRule, "; "))
+	if len(errs) == 0 && len(incompleteIngressToRouteRules) > 0 {
+		c.eventRecorder.Eventf(ingress, corev1.EventTypeNormal, "incompleteIngressToRouteRules", "Incomplete ingress to route rules detected: %s", strings.Join(incompleteIngressToRouteRules, "; "))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -699,8 +697,8 @@ func routeMatchesIngress(
 	serviceLister corelisters.ServiceLister,
 	host string,
 	hostIsWildcard bool,
-	ingressToRouteRule []string,
-) ([]string, bool) {
+) (bool, []string) {
+	var incompleteIngressToRouteRules []string
 	wildcardPolicy := routev1.WildcardPolicyNone
 	if hostIsWildcard {
 		wildcardPolicy = routev1.WildcardPolicySubdomain
@@ -715,36 +713,28 @@ func routeMatchesIngress(
 		route.OwnerReferences[0].APIVersion == "networking.k8s.io/v1"
 
 	if !match {
-		return ingressToRouteRule, false
+		return false, incompleteIngressToRouteRules
 	}
 
 	targetPort, err := targetPortForService(ingress.Namespace, path.Backend.Service, serviceLister)
 	if err != nil {
-		if !contains(ingressToRouteRule, "No valid target port") {
-			ingressToRouteRule = append(ingressToRouteRule, "No valid target port")
-			// not valid
-		}
-		return ingressToRouteRule, false
+		// not valid
+		incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("No valid target port for backend service %q", path.Backend.Service.Name))
+		return false, incompleteIngressToRouteRules
 	}
 	if targetPort == nil && route.Spec.Port != nil {
-		if !contains(ingressToRouteRule, "Route specifies a port but the service has no port") {
-			ingressToRouteRule = append(ingressToRouteRule, "Route specifies a port but the service has no port")
-		}
-		return ingressToRouteRule, false
+		incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("Route specifies a port but the backend service %q has no port", path.Backend.Service.Name))
+		return false, incompleteIngressToRouteRules
 	}
 	if targetPort != nil && (route.Spec.Port == nil || *targetPort != route.Spec.Port.TargetPort) {
-		if !contains(ingressToRouteRule, "Service target port does not match route target port") {
-			ingressToRouteRule = append(ingressToRouteRule, "Service target port does not match route target port")
-		}
-		return ingressToRouteRule, false
+		incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, "Target port of %q backend service does not match route target port")
+		return false, incompleteIngressToRouteRules
 	}
 
 	tlsConfig, hasInvalidSecret := tlsConfigForIngress(ingress, rule, secretLister)
 	if hasInvalidSecret {
-		if !contains(ingressToRouteRule, "Invalid or missing TLS secret") {
-			ingressToRouteRule = append(ingressToRouteRule, "Invalid or missing TLS secret")
-		}
-		return ingressToRouteRule, false
+		incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("Invalid or missing TLS secret for rule host %q", rule.Host))
+		return false, incompleteIngressToRouteRules
 	}
 
 	if route.Spec.TLS != nil && tlsConfig != nil {
@@ -753,7 +743,7 @@ func routeMatchesIngress(
 			tlsConfig.DestinationCACertificate = route.Spec.TLS.DestinationCACertificate
 		}
 	}
-	return ingressToRouteRule, reflect.DeepEqual(tlsConfig, route.Spec.TLS)
+	return reflect.DeepEqual(tlsConfig, route.Spec.TLS), incompleteIngressToRouteRules
 }
 
 // targetPortForService returns a target port for a Route based on the given
