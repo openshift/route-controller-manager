@@ -362,14 +362,6 @@ func (c *Controller) handleNamespaceErr(err error, key interface{}) {
 		Name:      key.(queueKey).name,
 	}, corev1.EventTypeWarning, "FailedIngressToRouteConversion", "Error in converting Ingress to Route: %v", err)
 }
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
 
 func (c *Controller) sync(key queueKey) error {
 	// sync all ingresses in the namespace
@@ -571,7 +563,7 @@ func (c *Controller) sync(key queueKey) error {
 		}
 	}
 	if len(errs) == 0 && len(incompleteIngressToRouteRules) > 0 {
-		c.eventRecorder.Eventf(ingress, corev1.EventTypeNormal, "incompleteIngressToRouteRules", "Incomplete ingress to route rules detected: %s", strings.Join(incompleteIngressToRouteRules, "; "))
+		c.eventRecorder.Eventf(ingress, corev1.EventTypeNormal, "IncompleteIngressToRouteRules", "Incomplete ingress to route rules detected: %s", strings.Join(incompleteIngressToRouteRules, "; "))
 	}
 	return utilerrors.NewAggregate(errs)
 }
