@@ -1,6 +1,7 @@
 package ingress
 
 import (
+	"k8s.io/client-go/tools/record"
 	"reflect"
 	"strings"
 	"testing"
@@ -3872,6 +3873,7 @@ func TestController_sync(t *testing.T) {
 				secretLister:       tt.fields.s,
 				serviceLister:      tt.fields.svc,
 				expectations:       tt.expects,
+				eventRecorder:      record.NewFakeRecorder(100),
 			}
 			// default these
 			if c.expectations == nil {
