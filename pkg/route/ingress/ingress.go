@@ -741,13 +741,13 @@ func routeMatchesIngress(
 	}
 	if targetPort != nil && (route.Spec.Port == nil || *targetPort != route.Spec.Port.TargetPort) {
 		incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, "Target port of %q backend service does not match route target port")
-		return false, fmt.Errorf("target port of %q backend service does not match route target port")
+		return false, fmt.Errorf("target port of %q backend service does not match route target port", path.Backend.Service.Name)
 	}
 
 	tlsConfig, hasInvalidSecret := tlsConfigForIngress(ingress, rule, secretLister)
 	if hasInvalidSecret {
 		incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("Invalid or missing TLS secret for rule host %q", rule.Host))
-		return false, fmt.Errorf("invalid or missing TLS secret for rule host %q\", rule.Host")
+		return false, fmt.Errorf("invalid or missing TLS secret for rule host %q", rule.Host)
 	}
 
 	if route.Spec.TLS != nil && tlsConfig != nil {
