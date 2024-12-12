@@ -7,6 +7,8 @@ reviewers:
   - rfredette
   - alebedev87
   - gcs278
+  - Thealisyed
+  - grzpiotrowski
 approvers:
   - knobunc
   - Miciah
@@ -16,6 +18,8 @@ approvers:
   - rfredette
   - alebedev87
   - gcs278
+  - Thealisyed
+  - grzpiotrowski
 emeritus_approvers:
   - bparees
   - mfojtik
