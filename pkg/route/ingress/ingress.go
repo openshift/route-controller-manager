@@ -958,9 +958,14 @@ func terminationPolicyForIngress(ingress *networkingv1.Ingress) routev1.TLSTermi
 }
 
 var destinationCACertificateAnnotationKey = routev1.GroupName + "/destination-ca-certificate-secret"
+var destinationCACertificateAnnotationKeyField = routev1.GroupName + "/destination-ca-certificate-secret-key"
 
 func destinationCACertificateForIngress(ingress *networkingv1.Ingress, secretLister corelisters.SecretLister) *string {
 	name := ingress.Annotations[destinationCACertificateAnnotationKey]
+	secretKey := corev1.TLSCertKey
+	if v, ok := ingress.Annotations[destinationCACertificateAnnotationKeyField]; ok {
+		secretKey = v
+	}
 	secret, err := secretLister.Secrets(ingress.Namespace).Get(name)
 	if err != nil {
 		return nil
@@ -970,7 +975,7 @@ func destinationCACertificateForIngress(ingress *networkingv1.Ingress, secretLis
 	default:
 		return nil
 	}
-	if v, ok := secret.Data[corev1.TLSCertKey]; ok {
+	if v, ok := secret.Data[secretKey]; ok {
 		value := string(v)
 		return &value
 	}
