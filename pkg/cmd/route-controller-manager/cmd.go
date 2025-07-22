@@ -3,6 +3,7 @@ package openshift_controller_manager
 import (
 	"context"
 	"github.com/spf13/cobra"
+	"k8s.io/utils/clock"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
@@ -18,7 +19,7 @@ const (
 )
 
 func NewRouteControllerManagerCommand(name string) *cobra.Command {
-	cmd := controllercmd.NewControllerCommandConfig("route-controller-manager", rcmversion.Get(), RunRouteControllerManager).
+	cmd := controllercmd.NewControllerCommandConfig("route-controller-manager", rcmversion.Get(), RunRouteControllerManager, clock.RealClock{}).
 		WithComponentOwnerReference(&corev1.ObjectReference{
 			Kind:      "Pod",
 			Name:      os.Getenv(podNameEnv),
