@@ -508,8 +508,19 @@ func (c *Controller) sync(key queueKey) error {
 		if err != nil {
 			return err
 		}
+
+		labelReplacementString := ""
+		if propagateLabelsToRoute(route.GetAnnotations()) {
+			labels, err := json.Marshal(&route.Labels)
+			if err != nil {
+				return err
+			}
+			labelReplacementString = fmt.Sprintf(`{"op":"replace","path":"/metadata/labels","value":%s},`, labels)
+		}
+
 		data = []byte(fmt.Sprintf(`[{"op":"replace","path":"/spec","value":%s},`+
 			`{"op":"replace","path":"/metadata/annotations","value":%s},`+
+			labelReplacementString+
 			`{"op":"replace","path":"/metadata/ownerReferences","value":%s}]`,
 			data, annotations, ownerRefs))
 		_, err = c.routeClient.Routes(route.Namespace).Patch(context.TODO(), route.Name, types.JSONPatchType, data, metav1.PatchOptions{})
@@ -714,6 +725,7 @@ func routeMatchesIngress(
 	if hostIsWildcard {
 		wildcardPolicy = routev1.WildcardPolicySubdomain
 	}
+
 	match := route.Spec.Host == host &&
 		route.Spec.Path == path.Path &&
 		route.Spec.To.Name == path.Backend.Service.Name &&
@@ -721,7 +733,10 @@ func routeMatchesIngress(
 		len(route.Spec.AlternateBackends) == 0 &&
 		route.Spec.WildcardPolicy == wildcardPolicy &&
 		reflect.DeepEqual(route.Annotations, ingress.Annotations) &&
-		route.OwnerReferences[0].APIVersion == "networking.k8s.io/v1"
+		route.OwnerReferences[0].APIVersion == "networking.k8s.io/v1" &&
+		// Labels are flagged. If the propagation to labels is disabled, we don't care about them matching,
+		// otherwise we need to check it
+		(!propagateLabelsToRoute(ingress.GetAnnotations()) || reflect.DeepEqual(route.Labels, ingress.Labels))
 
 	if !match {
 		return false, nil
@@ -972,4 +987,9 @@ func destinationCACertificateForIngress(ingress *networkingv1.Ingress, secretLis
 		return &value
 	}
 	return nil
+}
+
+func propagateLabelsToRoute(annotations map[string]string) bool {
+	propagateLabelsFlag, ok := annotations[routecontroller.PropagateIngressLabelFlag]
+	return ok && propagateLabelsFlag == "true"
 }
