@@ -1,7 +1,6 @@
 package ingress
 
 import (
-	"k8s.io/client-go/tools/record"
 	"reflect"
 	"strings"
 	"testing"
@@ -20,6 +19,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	networkingv1listers "k8s.io/client-go/listers/networking/v1"
 	clientgotesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -1127,6 +1127,86 @@ func TestController_sync(t *testing.T) {
 			},
 		},
 		{
+			name: "create route - replicate label during creation",
+			fields: fields{
+				i: &ingressLister{Items: []*networkingv1.Ingress{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "1",
+							Namespace: "test",
+							Labels: map[string]string{
+								"something": "anything",
+							},
+						},
+						Spec: networkingv1.IngressSpec{
+							IngressClassName: &openshiftDefaultIngressClassName,
+							Rules: []networkingv1.IngressRule{
+								{
+									Host: "test.com",
+									IngressRuleValue: networkingv1.IngressRuleValue{
+										HTTP: &networkingv1.HTTPIngressRuleValue{
+											Paths: []networkingv1.HTTPIngressPath{
+												{
+													Backend: networkingv1.IngressBackend{
+														Service: &networkingv1.IngressServiceBackend{
+															Name: "service-1",
+															Port: networkingv1.ServiceBackendPort{
+																Name: "http",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+				ic: &ingressclassLister{Items: []*networkingv1.IngressClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "openshift-default",
+						},
+						Spec: networkingv1.IngressClassSpec{
+							Controller: "openshift.io/ingress-to-route",
+							Parameters: &networkingv1.IngressClassParametersReference{
+								APIGroup: &operatorv1GroupVersion,
+								Kind:     "IngressController",
+								Name:     "default",
+							},
+						},
+					},
+				}},
+				r: &routeLister{},
+			},
+			args:        queueKey{namespace: "test", name: "1"},
+			wantExpects: []queueKey{{namespace: "test", name: "1"}},
+			wantRouteCreates: []*routev1.Route{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "<generated>",
+						Namespace:       "test",
+						OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "1", Controller: &boolTrue}},
+						Labels: map[string]string{
+							"something": "anything",
+						},
+					},
+					Spec: routev1.RouteSpec{
+						Host: "test.com",
+						To: routev1.RouteTargetReference{
+							Kind: "Service",
+							Name: "service-1",
+						},
+						Port: &routev1.RoutePort{
+							TargetPort: intstr.FromString("http"),
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "create route - custom ingresscontroller",
 			fields: fields{
 				i: &ingressLister{Items: []*networkingv1.Ingress{
@@ -1323,6 +1403,150 @@ func TestController_sync(t *testing.T) {
 				{
 					Name:  "1-abcdef",
 					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+				},
+			},
+		},
+		{
+			name: "update route and propagate labels",
+			fields: fields{
+				i: &ingressLister{Items: []*networkingv1.Ingress{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "1",
+							Namespace: "test",
+							Annotations: map[string]string{
+								"route.openshift.io/reconcile-labels": "true",
+							},
+							Labels: map[string]string{
+								"my-label": "somevalue",
+							},
+						},
+						Spec: networkingv1.IngressSpec{
+							Rules: []networkingv1.IngressRule{
+								{
+									Host: "test.com",
+									IngressRuleValue: networkingv1.IngressRuleValue{
+										HTTP: &networkingv1.HTTPIngressRuleValue{
+											Paths: []networkingv1.HTTPIngressPath{
+												{
+													Path:     "/",
+													PathType: &pathTypePrefix,
+													Backend: networkingv1.IngressBackend{
+														Service: &networkingv1.IngressServiceBackend{
+															Name: "service-1",
+															Port: networkingv1.ServiceBackendPort{
+																Name: "http",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+				r: &routeLister{Items: []*routev1.Route{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "1-abcdef",
+							Namespace:       "test",
+							OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "1", Controller: &boolTrue}},
+						},
+						Spec: routev1.RouteSpec{
+							Host: "test.com",
+							Path: "/",
+							To: routev1.RouteTargetReference{
+								Kind: "Service",
+								Name: "service-1",
+							},
+							Port: &routev1.RoutePort{
+								TargetPort: intstr.FromInt(80),
+							},
+							WildcardPolicy: routev1.WildcardPolicyNone,
+						},
+					},
+				}},
+			},
+			args: queueKey{namespace: "test", name: "1"},
+			wantRoutePatches: []clientgotesting.PatchActionImpl{
+				{
+					Name:  "1-abcdef",
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"true"}},{"op":"replace","path":"/metadata/labels","value":{"my-label":"somevalue"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+				},
+			},
+		},
+		{
+			name: "update route and do not propagate labels because of invalid flag value",
+			fields: fields{
+				i: &ingressLister{Items: []*networkingv1.Ingress{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "1",
+							Namespace: "test",
+							Annotations: map[string]string{
+								"route.openshift.io/reconcile-labels": "NotTrue",
+							},
+							Labels: map[string]string{
+								"my-label": "somevalue",
+							},
+						},
+						Spec: networkingv1.IngressSpec{
+							Rules: []networkingv1.IngressRule{
+								{
+									Host: "test.com",
+									IngressRuleValue: networkingv1.IngressRuleValue{
+										HTTP: &networkingv1.HTTPIngressRuleValue{
+											Paths: []networkingv1.HTTPIngressPath{
+												{
+													Path:     "/",
+													PathType: &pathTypePrefix,
+													Backend: networkingv1.IngressBackend{
+														Service: &networkingv1.IngressServiceBackend{
+															Name: "service-1",
+															Port: networkingv1.ServiceBackendPort{
+																Name: "http",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+				r: &routeLister{Items: []*routev1.Route{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "1-abcdef",
+							Namespace:       "test",
+							OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "1", Controller: &boolTrue}},
+						},
+						Spec: routev1.RouteSpec{
+							Host: "test.com",
+							Path: "/",
+							To: routev1.RouteTargetReference{
+								Kind: "Service",
+								Name: "service-1",
+							},
+							Port: &routev1.RoutePort{
+								TargetPort: intstr.FromInt(80),
+							},
+							WildcardPolicy: routev1.WildcardPolicyNone,
+						},
+					},
+				}},
+			},
+			args: queueKey{namespace: "test", name: "1"},
+			wantRoutePatches: []clientgotesting.PatchActionImpl{
+				{
+					Name:  "1-abcdef",
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"NotTrue"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
 		},
