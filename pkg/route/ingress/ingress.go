@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -415,6 +416,15 @@ func (c *Controller) sync(key queueKey) error {
 		old = append(old, route)
 	}
 
+	propagateLabels, err := shouldPropagateLabelsToRoute(ingress.Annotations)
+	if err != nil {
+		c.eventRecorder.Eventf(&corev1.ObjectReference{
+			Kind:      "Ingress",
+			Namespace: key.namespace,
+			Name:      key.name,
+		}, corev1.EventTypeNormal, "InvalidAnnotationValue", "Invalid value on annotation %q", routecontroller.PropagateIngressLabelFlag)
+	}
+
 	// walk the ingress and identify whether any of the child routes need to be updated, deleted,
 	// or created, as efficiently as possible.
 	var creates, updates, matches []*routev1.Route
@@ -463,7 +473,7 @@ func (c *Controller) sync(key queueKey) error {
 				continue
 			}
 
-			match, err := routeMatchesIngress(existing, ingress, &rule, &path, c.secretLister, c.serviceLister, host, hostIsWildcard)
+			match, err := routeMatchesIngress(existing, ingress, &rule, &path, c.secretLister, c.serviceLister, host, hostIsWildcard, propagateLabels)
 			if err != nil {
 				incompleteIngressToRouteRules = append(incompleteIngressToRouteRules, fmt.Sprintf("%s at index %d, path index %d", err.Error(), i, j))
 			}
@@ -723,6 +733,7 @@ func routeMatchesIngress(
 	serviceLister corelisters.ServiceLister,
 	host string,
 	hostIsWildcard bool,
+	propagateLabels bool,
 ) (bool, error) {
 	wildcardPolicy := routev1.WildcardPolicyNone
 	if hostIsWildcard {
@@ -738,7 +749,7 @@ func routeMatchesIngress(
 		reflect.DeepEqual(route.Annotations, ingress.Annotations) &&
 		route.OwnerReferences[0].APIVersion == "networking.k8s.io/v1" &&
 		// Matching labels is conditional on the 'reconcile-labels' annotation's being set to 'true'
-		(!propagateLabelsToRoute(ingress.Annotations) || reflect.DeepEqual(route.Labels, ingress.Labels))
+		(!propagateLabels || reflect.DeepEqual(route.Labels, ingress.Labels))
 
 	if !match {
 		return false, nil
@@ -991,7 +1002,11 @@ func destinationCACertificateForIngress(ingress *networkingv1.Ingress, secretLis
 	return nil
 }
 
-func propagateLabelsToRoute(annotations map[string]string) bool {
+func shouldPropagateLabelsToRoute(annotations map[string]string) (bool, error) {
 	propagateLabelsFlag, ok := annotations[routecontroller.PropagateIngressLabelFlag]
-	return ok && propagateLabelsFlag == "true"
+	if !ok || propagateLabelsFlag == "" {
+		return false, nil
+	}
+
+	return strconv.ParseBool(strings.ToLower(propagateLabelsFlag))
 }

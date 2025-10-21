@@ -2,6 +2,7 @@ package ingress
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -545,6 +546,7 @@ func TestController_sync(t *testing.T) {
 		wantQueue          []queueKey
 		wantExpectation    *expectations
 		wantExpects        []queueKey
+		expectedEvents     []string
 	}{
 		{
 			name:   "no changes",
@@ -1619,6 +1621,7 @@ func TestController_sync(t *testing.T) {
 					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"NotTrue"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
+			expectedEvents: []string{`Normal InvalidAnnotationValue Invalid value on annotation "route.openshift.io/reconcile-labels"`},
 		},
 		{
 			name: "no-op",
@@ -4157,6 +4160,7 @@ func TestController_sync(t *testing.T) {
 				return true, nil, nil
 			})
 
+			recorder := record.NewFakeRecorder(100)
 			c := &Controller{
 				queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingress-to-route-test"),
 				routeClient:        routeClientset.RouteV1(),
@@ -4167,7 +4171,7 @@ func TestController_sync(t *testing.T) {
 				secretLister:       tt.fields.s,
 				serviceLister:      tt.fields.svc,
 				expectations:       tt.expects,
-				eventRecorder:      record.NewFakeRecorder(100),
+				eventRecorder:      recorder,
 			}
 			// default these
 			if c.expectations == nil {
@@ -4188,6 +4192,7 @@ func TestController_sync(t *testing.T) {
 			}
 
 			c.queue.ShutDown()
+			close(recorder.Events)
 			var hasQueue []queueKey
 			for {
 				key, shutdown := c.queue.Get()
@@ -4294,6 +4299,19 @@ func TestController_sync(t *testing.T) {
 			if len(ingressActions) != 0 {
 				t.Fatalf("Controller.sync() unexpected actions: %#v", ingressActions)
 			}
+
+			// Read and assert events
+			events := make([]string, 0)
+			for i := range recorder.Events {
+				events = append(events, i)
+			}
+
+			for _, expectedEvent := range tt.expectedEvents {
+				if !slices.Contains(events, expectedEvent) {
+					t.Errorf("event %q not found on recorded events", expectedEvent)
+				}
+			}
+
 		})
 	}
 }
