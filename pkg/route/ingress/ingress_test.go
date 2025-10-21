@@ -1474,7 +1474,7 @@ func TestController_sync(t *testing.T) {
 			wantRoutePatches: []clientgotesting.PatchActionImpl{
 				{
 					Name:  "1-abcdef",
-					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"true"}},{"op":"replace","path":"/metadata/labels","value":{"my-label":"somevalue"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"true"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]},{"op":"replace","path":"/metadata/labels","value":{"my-label":"somevalue"}}]`),
 				},
 			},
 		},

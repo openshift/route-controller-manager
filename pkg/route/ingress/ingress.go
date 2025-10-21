@@ -496,33 +496,36 @@ func (c *Controller) sync(key queueKey) error {
 
 	// update any existing routes in place
 	for _, route := range updates {
-		data, err := json.Marshal(&route.Spec)
-		if err != nil {
-			return err
-		}
-		annotations, err := json.Marshal(&route.Annotations)
-		if err != nil {
-			return err
-		}
-		ownerRefs, err := json.Marshal(&route.OwnerReferences)
-		if err != nil {
-			return err
-		}
-
-		labelReplacementString := ""
-		if propagateLabelsToRoute(route.GetAnnotations()) {
-			labels, err := json.Marshal(&route.Labels)
-			if err != nil {
-				return err
-			}
-			labelReplacementString = fmt.Sprintf(`{"op":"replace","path":"/metadata/labels","value":%s},`, labels)
+		patchOperations := []map[string]any{
+			{
+				"op":    "replace",
+				"path":  "/spec",
+				"value": &route.Spec,
+			},
+			{
+				"op":    "replace",
+				"path":  "/metadata/annotations",
+				"value": &route.Annotations,
+			},
+			{
+				"op":    "replace",
+				"path":  "/metadata/ownerReferences",
+				"value": &route.OwnerReferences,
+			},
 		}
 
-		data = []byte(fmt.Sprintf(`[{"op":"replace","path":"/spec","value":%s},`+
-			`{"op":"replace","path":"/metadata/annotations","value":%s},`+
-			labelReplacementString+
-			`{"op":"replace","path":"/metadata/ownerReferences","value":%s}]`,
-			data, annotations, ownerRefs))
+		if propagateLabels {
+			patchOperations = append(patchOperations, map[string]any{
+				"op":    "replace",
+				"path":  "/metadata/labels",
+				"value": &route.Labels,
+			})
+		}
+
+		data, err := json.Marshal(patchOperations)
+		if err != nil {
+			return err
+		}
 		_, err = c.routeClient.Routes(route.Namespace).Patch(context.TODO(), route.Name, types.JSONPatchType, data, metav1.PatchOptions{})
 		if err != nil {
 			errs = append(errs, err)
@@ -736,7 +739,7 @@ func routeMatchesIngress(
 		route.OwnerReferences[0].APIVersion == "networking.k8s.io/v1" &&
 		// Labels are flagged. If the propagation to labels is disabled, we don't care about them matching,
 		// otherwise we need to check it
-		(!propagateLabelsToRoute(ingress.GetAnnotations()) || reflect.DeepEqual(route.Labels, ingress.Labels))
+		(!propagateLabelsToRoute(ingress.Annotations) || reflect.DeepEqual(route.Labels, ingress.Labels))
 
 	if !match {
 		return false, nil
