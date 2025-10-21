@@ -737,8 +737,7 @@ func routeMatchesIngress(
 		route.Spec.WildcardPolicy == wildcardPolicy &&
 		reflect.DeepEqual(route.Annotations, ingress.Annotations) &&
 		route.OwnerReferences[0].APIVersion == "networking.k8s.io/v1" &&
-		// Labels are flagged. If the propagation to labels is disabled, we don't care about them matching,
-		// otherwise we need to check it
+		// Matching labels is conditional on the 'reconcile-labels' annotation's being set to 'true'
 		(!propagateLabelsToRoute(ingress.Annotations) || reflect.DeepEqual(route.Labels, ingress.Labels))
 
 	if !match {
