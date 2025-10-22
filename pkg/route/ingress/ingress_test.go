@@ -1,8 +1,8 @@
 package ingress
 
 import (
-	"k8s.io/client-go/tools/record"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,6 +20,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	networkingv1listers "k8s.io/client-go/listers/networking/v1"
 	clientgotesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -545,6 +546,7 @@ func TestController_sync(t *testing.T) {
 		wantQueue          []queueKey
 		wantExpectation    *expectations
 		wantExpects        []queueKey
+		expectedEvents     []string
 	}{
 		{
 			name:   "no changes",
@@ -619,7 +621,8 @@ func TestController_sync(t *testing.T) {
 				}},
 				r: &routeLister{},
 			},
-			args: queueKey{namespace: "test", name: "1"},
+			args:           queueKey{namespace: "test", name: "1"},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Missing host field in rule at index 0"},
 		},
 		{
 			name: "ignores incomplete ingress - no service",
@@ -659,7 +662,8 @@ func TestController_sync(t *testing.T) {
 				}},
 				r: &routeLister{},
 			},
-			args: queueKey{namespace: "test", name: "1"},
+			args:           queueKey{namespace: "test", name: "1"},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Missing backend service name in rule at index 0, path index 0"},
 		},
 		{
 			name: "ignores incomplete ingress - no paths",
@@ -776,7 +780,8 @@ func TestController_sync(t *testing.T) {
 				}},
 				r: &routeLister{},
 			},
-			args: queueKey{namespace: "test", name: "1"},
+			args:           queueKey{namespace: "test", name: "1"},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Unsupported exact path type in rule at index 0, path index 0"},
 		},
 		{
 			name: "ignores incomplete ingress - service does not exist",
@@ -816,7 +821,8 @@ func TestController_sync(t *testing.T) {
 				}},
 				r: &routeLister{},
 			},
-			args: queueKey{namespace: "test", name: "1"},
+			args:           queueKey{namespace: "test", name: "1"},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Backend service \"service-3\" not found at index 0, path index 0"},
 		},
 		{
 			name: "create route",
@@ -1127,6 +1133,86 @@ func TestController_sync(t *testing.T) {
 			},
 		},
 		{
+			name: "create route - replicate label during creation",
+			fields: fields{
+				i: &ingressLister{Items: []*networkingv1.Ingress{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "1",
+							Namespace: "test",
+							Labels: map[string]string{
+								"something": "anything",
+							},
+						},
+						Spec: networkingv1.IngressSpec{
+							IngressClassName: &openshiftDefaultIngressClassName,
+							Rules: []networkingv1.IngressRule{
+								{
+									Host: "test.com",
+									IngressRuleValue: networkingv1.IngressRuleValue{
+										HTTP: &networkingv1.HTTPIngressRuleValue{
+											Paths: []networkingv1.HTTPIngressPath{
+												{
+													Backend: networkingv1.IngressBackend{
+														Service: &networkingv1.IngressServiceBackend{
+															Name: "service-1",
+															Port: networkingv1.ServiceBackendPort{
+																Name: "http",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+				ic: &ingressclassLister{Items: []*networkingv1.IngressClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "openshift-default",
+						},
+						Spec: networkingv1.IngressClassSpec{
+							Controller: "openshift.io/ingress-to-route",
+							Parameters: &networkingv1.IngressClassParametersReference{
+								APIGroup: &operatorv1GroupVersion,
+								Kind:     "IngressController",
+								Name:     "default",
+							},
+						},
+					},
+				}},
+				r: &routeLister{},
+			},
+			args:        queueKey{namespace: "test", name: "1"},
+			wantExpects: []queueKey{{namespace: "test", name: "1"}},
+			wantRouteCreates: []*routev1.Route{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "<generated>",
+						Namespace:       "test",
+						OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "1", Controller: &boolTrue}},
+						Labels: map[string]string{
+							"something": "anything",
+						},
+					},
+					Spec: routev1.RouteSpec{
+						Host: "test.com",
+						To: routev1.RouteTargetReference{
+							Kind: "Service",
+							Name: "service-1",
+						},
+						Port: &routev1.RoutePort{
+							TargetPort: intstr.FromString("http"),
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "create route - custom ingresscontroller",
 			fields: fields{
 				i: &ingressLister{Items: []*networkingv1.Ingress{
@@ -1325,6 +1411,222 @@ func TestController_sync(t *testing.T) {
 					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Target port of \"service-1\" backend service does not match route target port at index 0, path index 0"},
+		},
+		{
+			name: "update route and propagate labels",
+			fields: fields{
+				i: &ingressLister{Items: []*networkingv1.Ingress{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "1",
+							Namespace: "test",
+							Annotations: map[string]string{
+								"route.openshift.io/reconcile-labels": "true",
+							},
+							Labels: map[string]string{
+								"my-label": "somevalue",
+							},
+						},
+						Spec: networkingv1.IngressSpec{
+							Rules: []networkingv1.IngressRule{
+								{
+									Host: "test.com",
+									IngressRuleValue: networkingv1.IngressRuleValue{
+										HTTP: &networkingv1.HTTPIngressRuleValue{
+											Paths: []networkingv1.HTTPIngressPath{
+												{
+													Path:     "/",
+													PathType: &pathTypePrefix,
+													Backend: networkingv1.IngressBackend{
+														Service: &networkingv1.IngressServiceBackend{
+															Name: "service-1",
+															Port: networkingv1.ServiceBackendPort{
+																Name: "http",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+				r: &routeLister{Items: []*routev1.Route{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "1-abcdef",
+							Namespace:       "test",
+							OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "1", Controller: &boolTrue}},
+						},
+						Spec: routev1.RouteSpec{
+							Host: "test.com",
+							Path: "/",
+							To: routev1.RouteTargetReference{
+								Kind: "Service",
+								Name: "service-1",
+							},
+							Port: &routev1.RoutePort{
+								TargetPort: intstr.FromInt(80),
+							},
+							WildcardPolicy: routev1.WildcardPolicyNone,
+						},
+					},
+				}},
+			},
+			args: queueKey{namespace: "test", name: "1"},
+			wantRoutePatches: []clientgotesting.PatchActionImpl{
+				{
+					Name:  "1-abcdef",
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"true"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]},{"op":"replace","path":"/metadata/labels","value":{"my-label":"somevalue"}}]`),
+				},
+			},
+		},
+		{
+			name: "delete labels from route when they are deleted from ingress",
+			fields: fields{
+				i: &ingressLister{Items: []*networkingv1.Ingress{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "1",
+							Namespace: "test",
+							Annotations: map[string]string{
+								"route.openshift.io/reconcile-labels": "true",
+							},
+						},
+						Spec: networkingv1.IngressSpec{
+							Rules: []networkingv1.IngressRule{
+								{
+									Host: "test.com",
+									IngressRuleValue: networkingv1.IngressRuleValue{
+										HTTP: &networkingv1.HTTPIngressRuleValue{
+											Paths: []networkingv1.HTTPIngressPath{
+												{
+													Path:     "/",
+													PathType: &pathTypePrefix,
+													Backend: networkingv1.IngressBackend{
+														Service: &networkingv1.IngressServiceBackend{
+															Name: "service-1",
+															Port: networkingv1.ServiceBackendPort{
+																Name: "http",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+				r: &routeLister{Items: []*routev1.Route{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "1-abcdef",
+							Namespace:       "test",
+							OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "1", Controller: &boolTrue}},
+							Labels:          map[string]string{"somelabel": "somevalue"},
+						},
+						Spec: routev1.RouteSpec{
+							Host: "test.com",
+							Path: "/",
+							To: routev1.RouteTargetReference{
+								Kind: "Service",
+								Name: "service-1",
+							},
+							Port: &routev1.RoutePort{
+								TargetPort: intstr.FromInt(80),
+							},
+							WildcardPolicy: routev1.WildcardPolicyNone,
+						},
+					},
+				}},
+			},
+			args: queueKey{namespace: "test", name: "1"},
+			wantRoutePatches: []clientgotesting.PatchActionImpl{
+				{
+					Name:  "1-abcdef",
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"true"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]},{"op":"replace","path":"/metadata/labels","value":null}]`),
+				},
+			},
+		},
+		{
+			name: "update route and do not propagate labels because of invalid flag value",
+			fields: fields{
+				i: &ingressLister{Items: []*networkingv1.Ingress{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "1",
+							Namespace: "test",
+							Annotations: map[string]string{
+								"route.openshift.io/reconcile-labels": "NotTrue",
+							},
+							Labels: map[string]string{
+								"my-label": "somevalue",
+							},
+						},
+						Spec: networkingv1.IngressSpec{
+							Rules: []networkingv1.IngressRule{
+								{
+									Host: "test.com",
+									IngressRuleValue: networkingv1.IngressRuleValue{
+										HTTP: &networkingv1.HTTPIngressRuleValue{
+											Paths: []networkingv1.HTTPIngressPath{
+												{
+													Path:     "/",
+													PathType: &pathTypePrefix,
+													Backend: networkingv1.IngressBackend{
+														Service: &networkingv1.IngressServiceBackend{
+															Name: "service-1",
+															Port: networkingv1.ServiceBackendPort{
+																Name: "http",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+				r: &routeLister{Items: []*routev1.Route{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "1-abcdef",
+							Namespace:       "test",
+							OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "1", Controller: &boolTrue}},
+						},
+						Spec: routev1.RouteSpec{
+							Host: "test.com",
+							Path: "/",
+							To: routev1.RouteTargetReference{
+								Kind: "Service",
+								Name: "service-1",
+							},
+							Port: &routev1.RoutePort{
+								TargetPort: intstr.FromInt(80),
+							},
+							WildcardPolicy: routev1.WildcardPolicyNone,
+						},
+					},
+				}},
+			},
+			args: queueKey{namespace: "test", name: "1"},
+			wantRoutePatches: []clientgotesting.PatchActionImpl{
+				{
+					Name:  "1-abcdef",
+					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"NotTrue"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
+				},
+			},
+			expectedEvents: []string{`Normal InvalidAnnotationValue Invalid value on annotation "route.openshift.io/reconcile-labels"`},
 		},
 		{
 			name: "no-op",
@@ -1697,6 +1999,7 @@ func TestController_sync(t *testing.T) {
 					Name: "1-abcdef",
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0; Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0"},
 		},
 		{
 			name: "update ingress with missing secret ref",
@@ -1765,6 +2068,7 @@ func TestController_sync(t *testing.T) {
 					Name: "1-abcdef",
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0; Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0"},
 		},
 		{
 			name: "update ingress to not reference secret",
@@ -3445,6 +3749,7 @@ func TestController_sync(t *testing.T) {
 					},
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0; Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0"},
 		},
 		{
 			name: "delete route when referenced secret is not valid",
@@ -3550,6 +3855,7 @@ func TestController_sync(t *testing.T) {
 					},
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0; Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0"},
 		},
 		{
 			name: "ignore route when parent ingress no longer exists (gc will handle)",
@@ -3863,6 +4169,7 @@ func TestController_sync(t *testing.T) {
 				return true, nil, nil
 			})
 
+			recorder := record.NewFakeRecorder(100)
 			c := &Controller{
 				queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ingress-to-route-test"),
 				routeClient:        routeClientset.RouteV1(),
@@ -3873,7 +4180,7 @@ func TestController_sync(t *testing.T) {
 				secretLister:       tt.fields.s,
 				serviceLister:      tt.fields.svc,
 				expectations:       tt.expects,
-				eventRecorder:      record.NewFakeRecorder(100),
+				eventRecorder:      recorder,
 			}
 			// default these
 			if c.expectations == nil {
@@ -3894,6 +4201,7 @@ func TestController_sync(t *testing.T) {
 			}
 
 			c.queue.ShutDown()
+			close(recorder.Events)
 			var hasQueue []queueKey
 			for {
 				key, shutdown := c.queue.Get()
@@ -4000,6 +4308,22 @@ func TestController_sync(t *testing.T) {
 			if len(ingressActions) != 0 {
 				t.Fatalf("Controller.sync() unexpected actions: %#v", ingressActions)
 			}
+
+			// Read the events from channel and add to a slice of string.
+			events := make([]string, 0)
+			for i := range recorder.Events {
+				events = append(events, i)
+			}
+
+			if !slices.Equal(tt.expectedEvents, events) {
+				t.Errorf("recorded events are not equal to expected events: Recorded %#v ; Expected: %#v ", events, tt.expectedEvents)
+			}
+			for _, expectedEvent := range tt.expectedEvents {
+				if !slices.Contains(events, expectedEvent) {
+
+				}
+			}
+
 		})
 	}
 }
