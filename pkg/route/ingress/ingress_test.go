@@ -621,7 +621,8 @@ func TestController_sync(t *testing.T) {
 				}},
 				r: &routeLister{},
 			},
-			args: queueKey{namespace: "test", name: "1"},
+			args:           queueKey{namespace: "test", name: "1"},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Missing host field in rule at index 0"},
 		},
 		{
 			name: "ignores incomplete ingress - no service",
@@ -661,7 +662,8 @@ func TestController_sync(t *testing.T) {
 				}},
 				r: &routeLister{},
 			},
-			args: queueKey{namespace: "test", name: "1"},
+			args:           queueKey{namespace: "test", name: "1"},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Missing backend service name in rule at index 0, path index 0"},
 		},
 		{
 			name: "ignores incomplete ingress - no paths",
@@ -778,7 +780,8 @@ func TestController_sync(t *testing.T) {
 				}},
 				r: &routeLister{},
 			},
-			args: queueKey{namespace: "test", name: "1"},
+			args:           queueKey{namespace: "test", name: "1"},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Unsupported exact path type in rule at index 0, path index 0"},
 		},
 		{
 			name: "ignores incomplete ingress - service does not exist",
@@ -818,7 +821,8 @@ func TestController_sync(t *testing.T) {
 				}},
 				r: &routeLister{},
 			},
-			args: queueKey{namespace: "test", name: "1"},
+			args:           queueKey{namespace: "test", name: "1"},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Backend service \"service-3\" not found at index 0, path index 0"},
 		},
 		{
 			name: "create route",
@@ -1407,6 +1411,7 @@ func TestController_sync(t *testing.T) {
 					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":null},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Target port of \"service-1\" backend service does not match route target port at index 0, path index 0"},
 		},
 		{
 			name: "update route and propagate labels",
@@ -1994,6 +1999,7 @@ func TestController_sync(t *testing.T) {
 					Name: "1-abcdef",
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0; Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0"},
 		},
 		{
 			name: "update ingress with missing secret ref",
@@ -2062,6 +2068,7 @@ func TestController_sync(t *testing.T) {
 					Name: "1-abcdef",
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0; Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0"},
 		},
 		{
 			name: "update ingress to not reference secret",
@@ -3742,6 +3749,7 @@ func TestController_sync(t *testing.T) {
 					},
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0; Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0"},
 		},
 		{
 			name: "delete route when referenced secret is not valid",
@@ -3847,6 +3855,7 @@ func TestController_sync(t *testing.T) {
 					},
 				},
 			},
+			expectedEvents: []string{"Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0; Invalid or missing TLS secret for rule host \"test.com\" at index 0, path index 0"},
 		},
 		{
 			name: "ignore route when parent ingress no longer exists (gc will handle)",
@@ -4300,15 +4309,18 @@ func TestController_sync(t *testing.T) {
 				t.Fatalf("Controller.sync() unexpected actions: %#v", ingressActions)
 			}
 
-			// Read and assert events
+			// Read the events from channel and add to a slice of string.
 			events := make([]string, 0)
 			for i := range recorder.Events {
 				events = append(events, i)
 			}
 
+			if !slices.Equal(tt.expectedEvents, events) {
+				t.Errorf("recorded events are not equal to expected events: Recorded %#v ; Expected: %#v ", events, tt.expectedEvents)
+			}
 			for _, expectedEvent := range tt.expectedEvents {
 				if !slices.Contains(events, expectedEvent) {
-					t.Errorf("event %q not found on recorded events", expectedEvent)
+
 				}
 			}
 
