@@ -416,6 +416,9 @@ func (c *Controller) sync(key queueKey) error {
 		old = append(old, route)
 	}
 
+	// In case the annotation does not contain a valid value, the reconciliation
+	// should continue, so we don't return the error, but instead register an
+	// event of InvalidAnnotationValue.
 	propagateLabels, err := shouldPropagateLabelsToRoute(ingress.Annotations)
 	if err != nil {
 		c.eventRecorder.Eventf(&corev1.ObjectReference{
@@ -1002,11 +1005,21 @@ func destinationCACertificateForIngress(ingress *networkingv1.Ingress, secretLis
 	return nil
 }
 
+// shouldPropagateLabelsToRoute verifies if annotation map contains the key
+// 'router.openshift.io/reconcile-labels' and if its value is a non-empty
+// parseable boolean (true, false, t, T, f, F, etc).
+// In case the annotation exists but the value is invalid, it will return "false"
+// and the parsing error.
+// Otherwise it returns the underlying boolean value.
 func shouldPropagateLabelsToRoute(annotations map[string]string) (bool, error) {
 	propagateLabelsFlag, ok := annotations[routecontroller.PropagateIngressLabelFlag]
-	if !ok || propagateLabelsFlag == "" {
+	if !ok {
 		return false, nil
 	}
 
-	return strconv.ParseBool(strings.ToLower(propagateLabelsFlag))
+	shouldPropagate, err := strconv.ParseBool(strings.ToLower(propagateLabelsFlag))
+	if err != nil {
+		return false, err
+	}
+	return shouldPropagate, nil
 }
