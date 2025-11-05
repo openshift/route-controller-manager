@@ -1626,7 +1626,7 @@ func TestController_sync(t *testing.T) {
 					Patch: []byte(`[{"op":"replace","path":"/spec","value":{"host":"test.com","path":"/","to":{"kind":"Service","name":"service-1","weight":null},"port":{"targetPort":"http"}}},{"op":"replace","path":"/metadata/annotations","value":{"route.openshift.io/reconcile-labels":"NotTrue"}},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"1","uid":"","controller":true}]}]`),
 				},
 			},
-			expectedEvents: []string{`Normal InvalidAnnotationValue Invalid value on annotation "route.openshift.io/reconcile-labels"`},
+			expectedEvents: []string{`Normal InvalidAnnotationValue Invalid value on annotation "route.openshift.io/reconcile-labels" due to: "strconv.ParseBool: parsing \"NotTrue\": invalid syntax"`},
 		},
 		{
 			name: "no-op",

@@ -425,7 +425,7 @@ func (c *Controller) sync(key queueKey) error {
 			Kind:      "Ingress",
 			Namespace: key.namespace,
 			Name:      key.name,
-		}, corev1.EventTypeNormal, "InvalidAnnotationValue", "Invalid value on annotation %q", routecontroller.PropagateIngressLabelFlag)
+		}, corev1.EventTypeNormal, "InvalidAnnotationValue", "Invalid value on annotation %q due to: %q", routecontroller.PropagateIngressLabelFlag, err)
 	}
 
 	// walk the ingress and identify whether any of the child routes need to be updated, deleted,
@@ -1017,7 +1017,7 @@ func shouldPropagateLabelsToRoute(annotations map[string]string) (bool, error) {
 		return false, nil
 	}
 
-	shouldPropagate, err := strconv.ParseBool(strings.ToLower(propagateLabelsFlag))
+	shouldPropagate, err := strconv.ParseBool(strings.TrimSpace(propagateLabelsFlag))
 	if err != nil {
 		return false, err
 	}
