@@ -4211,7 +4211,7 @@ func TestController_sync(t *testing.T) {
 				hasQueue = append(hasQueue, key.(queueKey))
 			}
 			if !reflect.DeepEqual(tt.wantQueue, hasQueue) {
-				t.Errorf("unexpected queue: %s", diff.ObjectReflectDiff(tt.wantQueue, hasQueue))
+				t.Errorf("unexpected queue: %s", diff.Diff(tt.wantQueue, hasQueue))
 			}
 
 			wants := tt.wantExpectation
@@ -4225,7 +4225,7 @@ func TestController_sync(t *testing.T) {
 				})
 			}
 			if !reflect.DeepEqual(wants, c.expectations) {
-				t.Errorf("unexpected expectations: %s", diff.ObjectReflectDiff(wants.expect, c.expectations.expect))
+				t.Errorf("unexpected expectations: %s", diff.Diff(wants.expect, c.expectations.expect))
 			}
 
 			routeActions := routeClientset.Actions()
@@ -4247,7 +4247,7 @@ func TestController_sync(t *testing.T) {
 					names = names[1:]
 				}
 				if !reflect.DeepEqual(tt.wantRouteCreates[i], obj) {
-					t.Errorf("unexpected create: %s", diff.ObjectReflectDiff(tt.wantRouteCreates[i], obj))
+					t.Errorf("unexpected create: %s", diff.Diff(tt.wantRouteCreates[i], obj))
 				}
 			}
 			routeActions = routeActions[len(tt.wantRouteCreates):]
