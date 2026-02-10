@@ -146,8 +146,8 @@ github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c h1:gJ
 github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
 github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c h1:TBE0Gl+oCo/SNEhLKZQNNH/SWHXrpGyhAw7P0lAqdHg=
 github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c/go.mod h1:IsynOWZAfdH+BgWimcFQRtI41Id9sgdhsCEjIk8ACLw=
-github.com/openshift/library-go v0.0.0-20251021141706-f489e811f030 h1:dbv8ZYDWIl22A5WBjQJTKeENM08f8HwMBuv8glDXO/0=
-github.com/openshift/library-go v0.0.0-20251021141706-f489e811f030/go.mod h1:OlFFws1AO51uzfc48MsStGE4SFMWlMZD0+f5a/zCtKI=
+github.com/openshift/library-go v0.0.0-20260121132910-dc3a1c884c04 h1:Fm9C8pT4l6VjpdqdhI1cBX9Y3D3S+rFxptVhCPBbMAI=
+github.com/openshift/library-go v0.0.0-20260121132910-dc3a1c884c04/go.mod h1:nIzWQQE49XbiKizVnVOip9CEB7HJ0hoJwNi3g3YKnKc=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
 github.com/pkg/profile v1.7.0 h1:hnbDkaNWPCLMO9wGLdBFTIZvzDrDfBM2072E1S9gJkA=
 github.com/pkg/profile v1.7.0/go.mod h1:8Uer0jas47ZQMJ7VD+OHknK4YDY07LPUC6dEvqDjvNo=
