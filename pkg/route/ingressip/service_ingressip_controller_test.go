@@ -620,3 +620,51 @@ func TestBasicControllerFlow(t *testing.T) {
 		t.Fatalf("failed waiting for delete: %v", err)
 	}
 }
+
+// TestClearPersistedAllocationRemovesDuplicateIngressIP verifies that
+// clearPersistedAllocation removes every occurrence of the ingress IP
+// from spec.ExternalIPs, not just the first one.
+//
+// This guards against the scenario described in OCPBUGS-39598, where
+// the ingress IP can end up duplicated in spec.ExternalIPs (e.g. due
+// to a race between two enqueued changes both calling ensureExternalIP
+// before the cache reflects the previously-persisted update). If
+// clearPersistedAllocation stops at the first match, the leftover
+// duplicate remains on the Service after the user patches spec.type
+// from LoadBalancer to ClusterIP, leaving a stale external IP that
+// the controller can no longer reclaim.
+func TestClearPersistedAllocationRemovesDuplicateIngressIP(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	c := newController(t, nil, stopCh)
+
+	c.persistenceHandler = func(client kcoreclient.ServicesGetter, service *v1.Service, targetStatus bool) error {
+		return nil
+	}
+
+	ingressIP := "172.16.0.1"
+	otherIPBefore := "172.16.1.1"
+	otherIPAfter := "172.16.1.2"
+
+	s := newService("svc", ingressIP, true)
+	// Seed the duplicated state the controller is observed to produce
+	// in OCPBUGS-39598: the same ingress IP appears twice in
+	// spec.ExternalIPs, interleaved with unrelated external IPs.
+	s.Spec.ExternalIPs = []string{otherIPBefore, ingressIP, otherIPAfter, ingressIP}
+	key := fmt.Sprintf("%s/%s", namespace, s.Name)
+
+	if err := c.clearPersistedAllocation(s, key, ""); err != nil {
+		t.Fatalf("unexpected error from clearPersistedAllocation: %v", err)
+	}
+
+	expectedExternalIPs := []string{otherIPBefore, otherIPAfter}
+	if got := s.Spec.ExternalIPs; !reflect.DeepEqual(expectedExternalIPs, got) {
+		t.Errorf("Expected ExternalIPs %v after clearing duplicated ingress IP, got %v",
+			expectedExternalIPs, got)
+	}
+
+	if ingressCount := len(s.Status.LoadBalancer.Ingress); ingressCount != 0 {
+		t.Errorf("Expected LoadBalancer ingress to be cleared, got %d entries",
+			ingressCount)
+	}
+}
