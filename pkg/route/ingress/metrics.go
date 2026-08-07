@@ -3,6 +3,7 @@ package ingress
 import (
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -76,24 +77,53 @@ func (c *Controller) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	// managedResult caches the outcome of checking whether an ingress is managed.
+	type managedResult struct {
+		managed bool // true if ingress exists and is managed
+		skip    bool // true if an error occurred, meaning we should skip metric update
+	}
+
+	// Cache ingressManaged results keyed by "namespace/name" to avoid
+	// redundant lister + ingressclass lookups for ingresses shared by many routes.
+	managedCache := make(map[string]managedResult, len(ingressInstances))
+
 	for _, routeInstance := range routeInstances {
 		labelVal := 0
-		if owner, have := hasIngressOwnerRef(routeInstance.OwnerReferences); have {
-			for _, ingressInstance := range ingressInstances {
-				ingress, err := c.ingressLister.Ingresses(ingressInstance.Namespace).Get(ingressInstance.Name)
-				if err != nil || ingress == nil {
-					continue
-				}
-				if ingress.Name == owner && ingress.Namespace == routeInstance.Namespace {
+		if ownerName, have := hasIngressOwnerRef(routeInstance.OwnerReferences); have {
+			// Owner references are namespace-scoped, so the owning ingress
+			// is always in the same namespace as the route.
+			cacheKey := routeInstance.Namespace + "/" + ownerName
+			result, cached := managedCache[cacheKey]
+			if !cached {
+				ingress, err := c.ingressLister.Ingresses(routeInstance.Namespace).Get(ownerName)
+				if err != nil {
+					// Only NotFound errors indicate a missing owner (unmanaged).
+					// Other lister failures should be handled separately to avoid
+					// incorrectly marking routes as unmanaged.
+					if apierrors.IsNotFound(err) {
+						result = managedResult{managed: false, skip: false}
+					} else {
+						utilruntime.HandleError(err)
+						result = managedResult{skip: true}
+					}
+				} else {
 					managed, err := c.ingressManaged(ingress)
 					if err != nil {
 						utilruntime.HandleError(err)
-						return
-					}
-					if !managed {
-						labelVal = 1
+						result = managedResult{skip: true}
+					} else {
+						result = managedResult{managed: managed, skip: false}
 					}
 				}
+				managedCache[cacheKey] = result
+			}
+			if result.skip {
+				// Delete stale metric labels before skipping to avoid publishing stale data.
+				unmanagedRoutes.DeleteLabelValues(routeInstance.Name, routeInstance.Namespace, routeInstance.Spec.Host)
+				continue
+			}
+			if !result.managed {
+				labelVal = 1
 			}
 		}
 		unmanagedRoutes.WithLabelValues(routeInstance.Name, routeInstance.Namespace, routeInstance.Spec.Host).Set(float64(labelVal))
