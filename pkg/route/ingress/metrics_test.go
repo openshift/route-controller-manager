@@ -34,12 +34,54 @@ func TestMetrics(t *testing.T) {
 	customIngressClassName := "custom"
 	openshiftDefaultIngressClassName := "openshift-default"
 
+	unmanagedIngress := networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "not-managed",
+			Namespace: "test",
+		},
+		Spec: networkingv1.IngressSpec{
+			IngressClassName: &customIngressClassName,
+		},
+	}
+
+	unmanagedIngressClass := networkingv1.IngressClass{
+		// IngressClass specifying "acme.io/ingress-controller" controller
+		ObjectMeta: metav1.ObjectMeta{
+			Name: customIngressClassName,
+		},
+		Spec: networkingv1.IngressClassSpec{
+			Controller: "acme.io/ingress-controller",
+		},
+	}
+	unmanagedRoute := func(host string) *routev1.Route {
+		return &routev1.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "owned-by-unmanaged",
+				Namespace:       "test",
+				OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "not-managed", Controller: &boolTrue}},
+			},
+			Spec: routev1.RouteSpec{
+				Host: host,
+			},
+		}
+	}
+
 	testCases := []struct {
-		name               string
+		name string
+
+		// listers for the first scrape
 		ingressLister      *ingressLister
 		ingressclassLister *ingressclassLister
 		routeLister        *routeLister
+
+		// listers for the second scrape, optional
+		ingressLister2      *ingressLister
+		ingressclassLister2 *ingressclassLister
+		routeLister2        *routeLister
+
+		// response of the first and second scrapes
 		expectedResponse   string
+		expectedResponses2 []string
 	}{
 		{
 			name: "Ingress with nil IngressClassName should return 1",
@@ -118,43 +160,13 @@ func TestMetrics(t *testing.T) {
 		{
 			name: "Route with an unmanaged Ingress owner should return 1",
 			ingressLister: &ingressLister{
-				Items: []*networkingv1.Ingress{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "not-managed",
-							Namespace: "test",
-						},
-						Spec: networkingv1.IngressSpec{
-							IngressClassName: &customIngressClassName,
-						},
-					},
-				},
+				Items: []*networkingv1.Ingress{&unmanagedIngress},
 			},
 			ingressclassLister: &ingressclassLister{
-				Items: []*networkingv1.IngressClass{
-					{ // IngressClass specifying "acme.io/ingress-controller" controller
-						ObjectMeta: metav1.ObjectMeta{
-							Name: customIngressClassName,
-						},
-						Spec: networkingv1.IngressClassSpec{
-							Controller: "acme.io/ingress-controller",
-						},
-					},
-				},
+				Items: []*networkingv1.IngressClass{&unmanagedIngressClass},
 			},
 			routeLister: &routeLister{
-				Items: []*routev1.Route{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            "owned-by-unmanaged",
-							Namespace:       "test",
-							OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "not-managed", Controller: &boolTrue}},
-						},
-						Spec: routev1.RouteSpec{
-							Host: "test.com",
-						},
-					},
-				},
+				Items: []*routev1.Route{unmanagedRoute("test.com")},
 			},
 			expectedResponse: "openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"test.com\",name=\"owned-by-unmanaged\",namespace=\"test\"} 1",
 		},
@@ -201,6 +213,55 @@ func TestMetrics(t *testing.T) {
 			},
 			expectedResponse: "openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"test.com\",name=\"owned-by-managed\",namespace=\"test\"} 0",
 		},
+		{
+			name: "Route removed after being flagged unmanaged resets its metric to 0",
+			ingressLister: &ingressLister{
+				Items: []*networkingv1.Ingress{&unmanagedIngress},
+			},
+			ingressclassLister: &ingressclassLister{
+				Items: []*networkingv1.IngressClass{&unmanagedIngressClass},
+			},
+			routeLister: &routeLister{
+				Items: []*routev1.Route{unmanagedRoute("test.com")},
+			},
+			expectedResponse: "openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"test.com\",name=\"owned-by-unmanaged\",namespace=\"test\"} 1",
+			ingressLister2: &ingressLister{
+				Items: []*networkingv1.Ingress{&unmanagedIngress},
+			},
+			ingressclassLister2: &ingressclassLister{
+				Items: []*networkingv1.IngressClass{&unmanagedIngressClass},
+			},
+			routeLister2: &routeLister{
+				Items: []*routev1.Route{},
+			},
+			expectedResponses2: []string{"openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"test.com\",name=\"owned-by-unmanaged\",namespace=\"test\"} 0"},
+		},
+		{
+			name: "Route host change resets the old host's metric and flags the new host",
+			ingressLister: &ingressLister{
+				Items: []*networkingv1.Ingress{&unmanagedIngress},
+			},
+			ingressclassLister: &ingressclassLister{
+				Items: []*networkingv1.IngressClass{&unmanagedIngressClass},
+			},
+			routeLister: &routeLister{
+				Items: []*routev1.Route{unmanagedRoute("test.com")},
+			},
+			expectedResponse: "openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"test.com\",name=\"owned-by-unmanaged\",namespace=\"test\"} 1",
+			ingressLister2: &ingressLister{
+				Items: []*networkingv1.Ingress{&unmanagedIngress},
+			},
+			ingressclassLister2: &ingressclassLister{
+				Items: []*networkingv1.IngressClass{&unmanagedIngressClass},
+			},
+			routeLister2: &routeLister{
+				Items: []*routev1.Route{unmanagedRoute("acme.local")},
+			},
+			expectedResponses2: []string{
+				"openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"test.com\",name=\"owned-by-unmanaged\",namespace=\"test\"} 0",
+				"openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"acme.local\",name=\"owned-by-unmanaged\",namespace=\"test\"} 1",
+			},
+		},
 	}
 
 	i := ingressLister{}
@@ -232,6 +293,22 @@ func TestMetrics(t *testing.T) {
 			respStr := rw.String()
 			if !strings.Contains(respStr, tc.expectedResponse) {
 				t.Errorf("expected string %s did not appear in %s", tc.expectedResponse, respStr)
+			}
+
+			if tc.ingressLister2 != nil || tc.ingressclassLister2 != nil || tc.routeLister2 != nil {
+				i.Items = tc.ingressLister2.Items
+				ic.Items = tc.ingressclassLister2.Items
+				r.Items = tc.routeLister2.Items
+
+				rw := &fakeResponseWriter{header: http.Header{}}
+				h.ServeHTTP(rw, &http.Request{})
+
+				respStr2 := rw.String()
+				for _, response := range tc.expectedResponses2 {
+					if !strings.Contains(respStr2, response) {
+						t.Errorf("second scrape - expected string %s did not appear in %s", tc.expectedResponses2, respStr2)
+					}
+				}
 			}
 		})
 	}
@@ -291,7 +368,7 @@ func Test_ResetIngressMetrics(t *testing.T) {
 	t.Log("Simulate deletion of ingress2 and update of ingress3.")
 
 	c.ingressLister = &ingressLister{Items: []*networkingv1.Ingress{i1, i3}}
-	c.ResetIngressMetrics(i2.Namespace, i2.Name)
+	c.resetIngressMetrics(i2.Namespace, i2.Name)
 	i3.Spec.IngressClassName = &defaultIngressClassName
 
 	assertMetrics(t,
