@@ -733,7 +733,9 @@ func preserveRouteAttributesFromExisting(r, existing *routev1.Route) {
 	r.Spec.To.Weight = existing.Spec.To.Weight
 	if r.Spec.TLS != nil && existing.Spec.TLS != nil {
 		r.Spec.TLS.CACertificate = existing.Spec.TLS.CACertificate
-		r.Spec.TLS.InsecureEdgeTerminationPolicy = existing.Spec.TLS.InsecureEdgeTerminationPolicy
+		if _, managed := insecureEdgeTerminationPolicy(r.Annotations, r.Spec.TLS.Termination); !managed {
+			r.Spec.TLS.InsecureEdgeTerminationPolicy = existing.Spec.TLS.InsecureEdgeTerminationPolicy
+		}
 		if r.Spec.TLS.Termination == routev1.TLSTerminationReencrypt {
 			if _, ok := r.Annotations[routecontroller.DestinationCACertificateAnnotationKey]; !ok {
 				r.Spec.TLS.DestinationCACertificate = existing.Spec.TLS.DestinationCACertificate
@@ -791,7 +793,9 @@ func routeMatchesIngress(
 	}
 
 	if route.Spec.TLS != nil && tlsConfig != nil {
-		tlsConfig.InsecureEdgeTerminationPolicy = route.Spec.TLS.InsecureEdgeTerminationPolicy
+		if _, managed := insecureEdgeTerminationPolicy(ingress.Annotations, tlsConfig.Termination); !managed {
+			tlsConfig.InsecureEdgeTerminationPolicy = route.Spec.TLS.InsecureEdgeTerminationPolicy
+		}
 		if _, ok := ingress.Annotations[routecontroller.DestinationCACertificateAnnotationKey]; !ok {
 			tlsConfig.DestinationCACertificate = route.Spec.TLS.DestinationCACertificate
 		}
@@ -933,9 +937,10 @@ func tlsConfigForIngress(
 	// Re-Encrypt: May have cert
 	// Passthrough: Must not have cert
 	terminationPolicy := terminationPolicyForIngress(ingress)
+	insecurePolicy, _ := insecureEdgeTerminationPolicy(ingress.Annotations, terminationPolicy)
 	tlsConfig := &routev1.TLSConfig{
 		Termination:                   terminationPolicy,
-		InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+		InsecureEdgeTerminationPolicy: insecurePolicy,
 	}
 	if terminationPolicy != routev1.TLSTerminationPassthrough && potentiallyNilTLSSecret != nil {
 		tlsConfig.Certificate = string(potentiallyNilTLSSecret.Data[corev1.TLSCertKey])
@@ -948,6 +953,21 @@ func tlsConfigForIngress(
 	}
 
 	return tlsConfig, false
+}
+
+func insecureEdgeTerminationPolicy(annotations map[string]string, termination routev1.TLSTerminationType) (routev1.InsecureEdgeTerminationPolicyType, bool) {
+	if value, present := annotations[routecontroller.InsecureEdgeTerminationPolicyAnnotationKey]; present {
+		policy := routev1.InsecureEdgeTerminationPolicyType(value)
+		switch policy {
+		case "", routev1.InsecureEdgeTerminationPolicyNone, routev1.InsecureEdgeTerminationPolicyRedirect:
+			return policy, true
+		case routev1.InsecureEdgeTerminationPolicyAllow:
+			if termination != routev1.TLSTerminationPassthrough {
+				return policy, true
+			}
+		}
+	}
+	return routev1.InsecureEdgeTerminationPolicyRedirect, false
 }
 
 var emptyTLS = networkingv1.IngressTLS{}
