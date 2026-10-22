@@ -14,6 +14,9 @@ var (
 	// TerminationPolicyAnnotationKey defines what TLSTerminationType should be used
 	// on the Route being created
 	TerminationPolicyAnnotationKey = routev1.GroupName + "/termination"
+	// InsecureEdgeTerminationPolicyAnnotationKey defines the annotation used to
+	// configure spec.tls.insecureEdgeTerminationPolicy on generated TLS Routes.
+	InsecureEdgeTerminationPolicyAnnotationKey = routev1.GroupName + "/insecure-edge-termination-policy"
 	// PropagateIngressLabelFlag defines if the labels of the Ingress resource
 	// should be used to replace the labels on the generated Route resource.
 	// In case this feature/annotation is enabled, any existing label on the
