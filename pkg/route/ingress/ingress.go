@@ -734,7 +734,7 @@ func preserveRouteAttributesFromExisting(r, existing *routev1.Route) {
 	if r.Spec.TLS != nil && existing.Spec.TLS != nil {
 		r.Spec.TLS.CACertificate = existing.Spec.TLS.CACertificate
 		if _, managed := insecureEdgeTerminationPolicy(r.Annotations, r.Spec.TLS.Termination); !managed {
-			r.Spec.TLS.InsecureEdgeTerminationPolicy = existing.Spec.TLS.InsecureEdgeTerminationPolicy
+			r.Spec.TLS.InsecureEdgeTerminationPolicy = normalizeInsecureEdgeTerminationPolicy(existing.Spec.TLS.InsecureEdgeTerminationPolicy, r.Spec.TLS.Termination)
 		}
 		if r.Spec.TLS.Termination == routev1.TLSTerminationReencrypt {
 			if _, ok := r.Annotations[routecontroller.DestinationCACertificateAnnotationKey]; !ok {
@@ -794,7 +794,7 @@ func routeMatchesIngress(
 
 	if route.Spec.TLS != nil && tlsConfig != nil {
 		if _, managed := insecureEdgeTerminationPolicy(ingress.Annotations, tlsConfig.Termination); !managed {
-			tlsConfig.InsecureEdgeTerminationPolicy = route.Spec.TLS.InsecureEdgeTerminationPolicy
+			tlsConfig.InsecureEdgeTerminationPolicy = normalizeInsecureEdgeTerminationPolicy(route.Spec.TLS.InsecureEdgeTerminationPolicy, tlsConfig.Termination)
 		}
 		if _, ok := ingress.Annotations[routecontroller.DestinationCACertificateAnnotationKey]; !ok {
 			tlsConfig.DestinationCACertificate = route.Spec.TLS.DestinationCACertificate
@@ -955,6 +955,9 @@ func tlsConfigForIngress(
 	return tlsConfig, false
 }
 
+// insecureEdgeTerminationPolicy returns the annotated policy and whether the
+// annotation controls it for the given termination. An absent, invalid, or
+// unsupported value returns Redirect without annotation control.
 func insecureEdgeTerminationPolicy(annotations map[string]string, termination routev1.TLSTerminationType) (routev1.InsecureEdgeTerminationPolicyType, bool) {
 	if value, present := annotations[routecontroller.InsecureEdgeTerminationPolicyAnnotationKey]; present {
 		policy := routev1.InsecureEdgeTerminationPolicyType(value)
@@ -968,6 +971,15 @@ func insecureEdgeTerminationPolicy(annotations map[string]string, termination ro
 		}
 	}
 	return routev1.InsecureEdgeTerminationPolicyRedirect, false
+}
+
+// normalizeInsecureEdgeTerminationPolicy converts Allow to Redirect for
+// passthrough termination and otherwise preserves the existing policy.
+func normalizeInsecureEdgeTerminationPolicy(policy routev1.InsecureEdgeTerminationPolicyType, termination routev1.TLSTerminationType) routev1.InsecureEdgeTerminationPolicyType {
+	if termination == routev1.TLSTerminationPassthrough && policy == routev1.InsecureEdgeTerminationPolicyAllow {
+		return routev1.InsecureEdgeTerminationPolicyRedirect
+	}
+	return policy
 }
 
 var emptyTLS = networkingv1.IngressTLS{}

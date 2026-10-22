@@ -39,7 +39,12 @@ policy is preserved. This controller default differs from the Route API default:
 an omitted or empty Route policy means `None`, not `Redirect`.
 
 Invalid values and `Allow` with passthrough termination are ignored: new TLS
-configurations use the default, and existing TLS Route policies are preserved.
+configurations use the default, and existing TLS Route policies are preserved,
+except that an existing `Allow` policy is converted to `Redirect` whenever the
+desired termination is passthrough. This includes transitions from edge or
+reencrypt to passthrough, because the Route API forbids `Allow` with passthrough.
+The same exception applies when the annotation is absent or removed; compatible
+existing policies remain unchanged.
 Passthrough supports `Redirect`, `None`, and the empty value. The annotation does
 not enable TLS and has no effect on the TLS configuration of non-TLS Routes,
 although the annotation itself is copied to generated Routes.

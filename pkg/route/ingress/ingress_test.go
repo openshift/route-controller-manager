@@ -4153,18 +4153,20 @@ func TestController_sync(t *testing.T) {
 	}
 	const policyAnnotation = "route.openshift.io/insecure-edge-termination-policy"
 	policyTests := []struct {
-		name               string
-		annotation         *string
-		existingAnnotation *string
-		termination        routev1.TLSTerminationType
-		existingPolicy     routev1.InsecureEdgeTerminationPolicyType
-		wantPolicy         routev1.InsecureEdgeTerminationPolicyType
-		wantTLSJSON        string
-		action             string
-		nonTLS             bool
-		mixed              bool
-		preserveAttributes bool
-		changePort         bool
+		name                string
+		annotation          *string
+		existingAnnotation  *string
+		termination         routev1.TLSTerminationType
+		existingTermination routev1.TLSTerminationType
+		existingPolicy      routev1.InsecureEdgeTerminationPolicyType
+		wantPolicy          routev1.InsecureEdgeTerminationPolicyType
+		wantTLSJSON         string
+		action              string
+		nonTLS              bool
+		mixed               bool
+		preserveAttributes  bool
+		changePort          bool
+		existingTLS         bool
 	}{
 		{
 			name: "create TLS route - explicit empty policy", annotation: ptr.To(""),
@@ -4281,6 +4283,99 @@ func TestController_sync(t *testing.T) {
 			existingPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "noop",
 		},
+		{
+			name:                "transition edge to passthrough - normalize unannotated Allow",
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:       "transition edge to passthrough - normalize Allow with invalid annotation",
+			annotation: ptr.To("allow"), existingAnnotation: ptr.To("allow"),
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:       "transition edge to passthrough - normalize unsupported Allow annotation",
+			annotation: ptr.To("Allow"), existingAnnotation: ptr.To("Allow"),
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:                "transition reencrypt to passthrough - normalize unannotated Allow",
+			existingTermination: routev1.TLSTerminationReencrypt, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:       "transition reencrypt to passthrough - normalize Allow with invalid annotation",
+			annotation: ptr.To("allow"), existingAnnotation: ptr.To("allow"),
+			existingTermination: routev1.TLSTerminationReencrypt, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:       "transition reencrypt to passthrough - normalize unsupported Allow annotation",
+			annotation: ptr.To("Allow"), existingAnnotation: ptr.To("Allow"),
+			existingTermination: routev1.TLSTerminationReencrypt, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:        "repair passthrough route - normalize existing Allow without metadata changes",
+			termination: routev1.TLSTerminationPassthrough, existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:        "no-op passthrough route - retain normalized Redirect without annotation",
+			termination: routev1.TLSTerminationPassthrough, existingPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyRedirect, action: "noop",
+		},
+		{
+			name:                "transition edge to passthrough - preserve None",
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyNone, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"None"}`,
+		},
+		{
+			name:                "transition reencrypt to passthrough - preserve empty policy",
+			existingTermination: routev1.TLSTerminationReencrypt, termination: routev1.TLSTerminationPassthrough,
+			wantPolicy: "", action: "patch", wantTLSJSON: `{"termination":"passthrough"}`,
+		},
+		{
+			name:                "transition edge to passthrough - preserve Redirect",
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:                "transition passthrough to edge - preserve None",
+			existingTermination: routev1.TLSTerminationPassthrough, termination: routev1.TLSTerminationEdge,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyNone, action: "patch",
+			wantTLSJSON: `{"termination":"edge","insecureEdgeTerminationPolicy":"None"}`,
+		},
+		{
+			name:                "transition passthrough to reencrypt - preserve empty policy",
+			existingTermination: routev1.TLSTerminationPassthrough, termination: routev1.TLSTerminationReencrypt,
+			wantPolicy: "", action: "patch", wantTLSJSON: `{"termination":"reencrypt"}`,
+		},
+		{
+			name:   "transition TLS to non-TLS - remove Allow with TLS configuration",
+			nonTLS: true, existingTLS: true, existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			action: "patch",
+		},
 	}
 	for _, policyTest := range policyTests {
 		annotations := map[string]string{}
@@ -4297,8 +4392,11 @@ func TestController_sync(t *testing.T) {
 			annotations["route.openshift.io/termination"] = string(termination)
 			existingAnnotations["route.openshift.io/termination"] = string(termination)
 		}
+		if policyTest.existingTermination != "" {
+			existingAnnotations["route.openshift.io/termination"] = string(policyTest.existingTermination)
+		}
 		path := "/"
-		if termination == routev1.TLSTerminationPassthrough {
+		if termination == routev1.TLSTerminationPassthrough || policyTest.existingTermination == routev1.TLSTerminationPassthrough {
 			path = ""
 		}
 		ingress := &networkingv1.Ingress{
@@ -4372,8 +4470,14 @@ func TestController_sync(t *testing.T) {
 				existing := wantRoute.DeepCopy()
 				existing.Annotations = existingAnnotations
 				existing.Spec.WildcardPolicy = routev1.WildcardPolicyNone
+				if policyTest.existingTLS {
+					existing.Spec.TLS = &routev1.TLSConfig{Termination: termination}
+				}
 				if existing.Spec.TLS != nil {
 					existing.Spec.TLS.InsecureEdgeTerminationPolicy = policyTest.existingPolicy
+					if policyTest.existingTermination != "" {
+						existing.Spec.TLS.Termination = policyTest.existingTermination
+					}
 				}
 				if policyTest.changePort {
 					existing.Spec.Port.TargetPort = intstr.FromInt(80)
