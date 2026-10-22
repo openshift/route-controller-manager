@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -102,6 +103,10 @@ func NewControllerContext(ctx context.Context, controllerContext *controllercmd.
 		KubernetesInformers: informers.NewSharedInformerFactory(kubeClient, defaultInformerResyncPeriod),
 		RouteInformers:      routeinformer.NewSharedInformerFactory(routerClient, defaultInformerResyncPeriod),
 		InformersStarted:    make(chan struct{}),
+	}
+
+	if routeControllerContext.IsControllerEnabled("openshift.io/ingress-to-route") {
+		routeControllerContext.KubernetesInformers.InformerFor(&corev1.Secret{}, newPaginatedSecretInformer)
 	}
 
 	return routeControllerContext, nil
