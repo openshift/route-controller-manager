@@ -101,10 +101,10 @@ require (
 	go.uber.org/zap v1.19.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
-	golang.org/x/term v0.21.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
@@ -162,9 +162,17 @@ replace google.golang.org/grpc => github.com/openshift-sustaining/grpc-go v1.64.
 
 // o tel package are needed to pinned at v0.20.0 after bumping grpc-go to v1.64.1-sec.1 or it will break the dependency chain
 replace go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
+
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
+
 replace go.opentelemetry.io/otel => go.opentelemetry.io/otel v0.20.0
+
 replace go.opentelemetry.io/otel/metric => go.opentelemetry.io/otel/metric v0.20.0
+
 replace go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v0.20.0
+
 replace go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v0.20.0
+
 replace go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.7.0
+
+replace golang.org/x/net => github.com/openshift-sustaining/net v0.35.0-sec.3
