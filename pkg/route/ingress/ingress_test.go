@@ -1,6 +1,8 @@
 package ingress
 
 import (
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -22,6 +24,7 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/ptr"
 
 	routev1 "github.com/openshift/api/route/v1"
 	routev1fake "github.com/openshift/client-go/route/clientset/versioned/fake"
@@ -533,7 +536,7 @@ func TestController_sync(t *testing.T) {
 		s   corelisters.SecretLister
 		svc corelisters.ServiceLister
 	}
-	tests := []struct {
+	type testCase struct {
 		name               string
 		fields             fields
 		args               queueKey
@@ -547,7 +550,8 @@ func TestController_sync(t *testing.T) {
 		wantExpectation    *expectations
 		wantExpects        []queueKey
 		expectedEvents     []string
-	}{
+	}
+	tests := []testCase{
 		{
 			name:   "no changes",
 			fields: fields{i: &ingressLister{}, r: &routeLister{}},
@@ -4146,6 +4150,363 @@ func TestController_sync(t *testing.T) {
 				},
 			},
 		},
+	}
+	const policyAnnotation = "route.openshift.io/insecure-edge-termination-policy"
+	policyTests := []struct {
+		name                string
+		annotation          *string
+		existingAnnotation  *string
+		termination         routev1.TLSTerminationType
+		existingTermination routev1.TLSTerminationType
+		existingPolicy      routev1.InsecureEdgeTerminationPolicyType
+		wantPolicy          routev1.InsecureEdgeTerminationPolicyType
+		wantTLSJSON         string
+		action              string
+		nonTLS              bool
+		mixed               bool
+		preserveAttributes  bool
+		changePort          bool
+		existingTLS         bool
+	}{
+		{
+			name: "create TLS route - explicit empty policy", annotation: ptr.To(""),
+			wantPolicy: "", action: "create",
+		},
+		{
+			name: "create TLS route - explicit None policy", annotation: ptr.To("None"),
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyNone, action: "create",
+		},
+		{
+			name: "create TLS route - explicit Allow policy", annotation: ptr.To("Allow"),
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyAllow, action: "create",
+		},
+		{
+			name: "create TLS route - explicit Redirect policy", annotation: ptr.To("Redirect"),
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyRedirect, action: "create",
+		},
+		{
+			name: "update TLS route - add Allow annotation", annotation: ptr.To("Allow"),
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyAllow, action: "patch",
+			wantTLSJSON: `{"termination":"edge","insecureEdgeTerminationPolicy":"Allow"}`,
+		},
+		{
+			name: "update TLS route - change Allow to empty", annotation: ptr.To(""),
+			existingAnnotation: ptr.To("Allow"), existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy: "", action: "patch",
+			wantTLSJSON: `{"termination":"edge"}`,
+		},
+		{
+			name: "update TLS route - change empty to None", annotation: ptr.To("None"),
+			existingAnnotation: ptr.To(""), existingPolicy: "",
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyNone, action: "patch",
+			wantTLSJSON: `{"termination":"edge","insecureEdgeTerminationPolicy":"None"}`,
+		},
+		{
+			name: "no-op TLS route - matching None annotation", annotation: ptr.To("None"),
+			existingAnnotation: ptr.To("None"), existingPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyNone, action: "noop",
+		},
+		{
+			name: "no-op TLS route - matching empty annotation", annotation: ptr.To(""),
+			existingAnnotation: ptr.To(""), existingPolicy: "",
+			wantPolicy: "", action: "noop",
+		},
+		{
+			name: "update reencrypt route - correct annotated Allow drift", annotation: ptr.To("Allow"),
+			existingAnnotation: ptr.To("Allow"), termination: routev1.TLSTerminationReencrypt,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyAllow, action: "patch", preserveAttributes: true,
+			wantTLSJSON: `{"termination":"reencrypt","destinationCACertificate":"user-ca","insecureEdgeTerminationPolicy":"Allow"}`,
+		},
+		{
+			name:               "update TLS route - remove policy annotation",
+			existingAnnotation: ptr.To("Allow"), existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyAllow, action: "patch",
+			wantTLSJSON: `{"termination":"edge","insecureEdgeTerminationPolicy":"Allow"}`,
+		},
+		{
+			name:           "update TLS route - preserve unannotated override",
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyNone, action: "patch", changePort: true,
+			wantTLSJSON: `{"termination":"edge","insecureEdgeTerminationPolicy":"None"}`,
+		},
+		{
+			name: "create non-TLS route - ignore Allow annotation", annotation: ptr.To("Allow"),
+			nonTLS: true, action: "create",
+		},
+		{
+			name: "update non-TLS route - change policy annotation", annotation: ptr.To("None"),
+			existingAnnotation: ptr.To("Allow"), nonTLS: true, action: "patch",
+		},
+		{
+			name: "update mixed routes - apply None to every TLS route", annotation: ptr.To("None"),
+			existingAnnotation: ptr.To("Redirect"), existingPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyNone, action: "patch", mixed: true,
+			wantTLSJSON: `{"termination":"edge","certificate":"cert","key":"key","insecureEdgeTerminationPolicy":"None"}`,
+		},
+		{
+			name: "create TLS route - ignore invalid lowercase policy", annotation: ptr.To("allow"),
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyRedirect, action: "create",
+		},
+		{
+			name: "update TLS route - invalid annotation preserves policy", annotation: ptr.To("allow"),
+			existingAnnotation: ptr.To("Allow"), existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyAllow, action: "patch",
+			wantTLSJSON: `{"termination":"edge","insecureEdgeTerminationPolicy":"Allow"}`,
+		},
+		{
+			name: "create passthrough route - ignore Allow policy", annotation: ptr.To("Allow"),
+			termination: routev1.TLSTerminationPassthrough,
+			wantPolicy:  routev1.InsecureEdgeTerminationPolicyRedirect, action: "create",
+		},
+		{
+			name: "update passthrough route - ignore Allow policy", annotation: ptr.To("Allow"),
+			existingAnnotation: ptr.To("None"), termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyNone, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"None"}`,
+		},
+		{
+			name: "create passthrough route - explicit None policy", annotation: ptr.To("None"),
+			termination: routev1.TLSTerminationPassthrough,
+			wantPolicy:  routev1.InsecureEdgeTerminationPolicyNone, action: "create",
+		},
+		{
+			name: "create passthrough route - explicit empty policy", annotation: ptr.To(""),
+			termination: routev1.TLSTerminationPassthrough,
+			wantPolicy:  "", action: "create",
+		},
+		{
+			name: "no-op passthrough route - matching Redirect policy", annotation: ptr.To("Redirect"),
+			existingAnnotation: ptr.To("Redirect"), termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "noop",
+		},
+		{
+			name:                "transition edge to passthrough - normalize unannotated Allow",
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:       "transition edge to passthrough - normalize Allow with invalid annotation",
+			annotation: ptr.To("allow"), existingAnnotation: ptr.To("allow"),
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:       "transition edge to passthrough - normalize unsupported Allow annotation",
+			annotation: ptr.To("Allow"), existingAnnotation: ptr.To("Allow"),
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:                "transition reencrypt to passthrough - normalize unannotated Allow",
+			existingTermination: routev1.TLSTerminationReencrypt, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:       "transition reencrypt to passthrough - normalize Allow with invalid annotation",
+			annotation: ptr.To("allow"), existingAnnotation: ptr.To("allow"),
+			existingTermination: routev1.TLSTerminationReencrypt, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:       "transition reencrypt to passthrough - normalize unsupported Allow annotation",
+			annotation: ptr.To("Allow"), existingAnnotation: ptr.To("Allow"),
+			existingTermination: routev1.TLSTerminationReencrypt, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:        "repair passthrough route - normalize existing Allow without metadata changes",
+			termination: routev1.TLSTerminationPassthrough, existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:        "no-op passthrough route - retain normalized Redirect without annotation",
+			termination: routev1.TLSTerminationPassthrough, existingPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			wantPolicy: routev1.InsecureEdgeTerminationPolicyRedirect, action: "noop",
+		},
+		{
+			name:                "transition edge to passthrough - preserve None",
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyNone, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"None"}`,
+		},
+		{
+			name:                "transition reencrypt to passthrough - preserve empty policy",
+			existingTermination: routev1.TLSTerminationReencrypt, termination: routev1.TLSTerminationPassthrough,
+			wantPolicy: "", action: "patch", wantTLSJSON: `{"termination":"passthrough"}`,
+		},
+		{
+			name:                "transition edge to passthrough - preserve Redirect",
+			existingTermination: routev1.TLSTerminationEdge, termination: routev1.TLSTerminationPassthrough,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyRedirect, action: "patch",
+			wantTLSJSON: `{"termination":"passthrough","insecureEdgeTerminationPolicy":"Redirect"}`,
+		},
+		{
+			name:                "transition passthrough to edge - preserve None",
+			existingTermination: routev1.TLSTerminationPassthrough, termination: routev1.TLSTerminationEdge,
+			existingPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+			wantPolicy:     routev1.InsecureEdgeTerminationPolicyNone, action: "patch",
+			wantTLSJSON: `{"termination":"edge","insecureEdgeTerminationPolicy":"None"}`,
+		},
+		{
+			name:                "transition passthrough to reencrypt - preserve empty policy",
+			existingTermination: routev1.TLSTerminationPassthrough, termination: routev1.TLSTerminationReencrypt,
+			wantPolicy: "", action: "patch", wantTLSJSON: `{"termination":"reencrypt"}`,
+		},
+		{
+			name:   "transition TLS to non-TLS - remove Allow with TLS configuration",
+			nonTLS: true, existingTLS: true, existingPolicy: routev1.InsecureEdgeTerminationPolicyAllow,
+			action: "patch",
+		},
+	}
+	for _, policyTest := range policyTests {
+		annotations := map[string]string{}
+		existingAnnotations := map[string]string{}
+		if policyTest.annotation != nil {
+			annotations[policyAnnotation] = *policyTest.annotation
+		}
+		if policyTest.existingAnnotation != nil {
+			existingAnnotations[policyAnnotation] = *policyTest.existingAnnotation
+		}
+		termination := routev1.TLSTerminationEdge
+		if policyTest.termination != "" {
+			termination = policyTest.termination
+			annotations["route.openshift.io/termination"] = string(termination)
+			existingAnnotations["route.openshift.io/termination"] = string(termination)
+		}
+		if policyTest.existingTermination != "" {
+			existingAnnotations["route.openshift.io/termination"] = string(policyTest.existingTermination)
+		}
+		path := "/"
+		if termination == routev1.TLSTerminationPassthrough || policyTest.existingTermination == routev1.TLSTerminationPassthrough {
+			path = ""
+		}
+		ingress := &networkingv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{Name: "policy", Namespace: "test", Annotations: annotations},
+			Spec: networkingv1.IngressSpec{
+				TLS: []networkingv1.IngressTLS{{}},
+				Rules: []networkingv1.IngressRule{{
+					Host: "test.com",
+					IngressRuleValue: networkingv1.IngressRuleValue{HTTP: &networkingv1.HTTPIngressRuleValue{
+						Paths: []networkingv1.HTTPIngressPath{{
+							Path: path, PathType: &pathTypeImplementationSpecific,
+							Backend: networkingv1.IngressBackend{Service: &networkingv1.IngressServiceBackend{
+								Name: "service-1", Port: networkingv1.ServiceBackendPort{Name: "http"},
+							}},
+						}},
+					}},
+				}},
+			},
+		}
+		if policyTest.nonTLS {
+			ingress.Spec.TLS = nil
+		}
+		if policyTest.mixed {
+			ingress.Spec.TLS = []networkingv1.IngressTLS{{Hosts: []string{"test.com"}, SecretName: "secret-1"}}
+			secondPath := ingress.Spec.Rules[0].HTTP.Paths[0].DeepCopy()
+			secondPath.Path = "/other"
+			ingress.Spec.Rules[0].HTTP.Paths = append(ingress.Spec.Rules[0].HTTP.Paths, *secondPath)
+			plainRule := ingress.Spec.Rules[0].DeepCopy()
+			plainRule.Host = "plain.test.com"
+			plainRule.HTTP.Paths = plainRule.HTTP.Paths[:1]
+			ingress.Spec.Rules = append(ingress.Spec.Rules, *plainRule)
+		}
+		existingRoutes := &routeLister{}
+		policyCase := testCase{
+			name: policyTest.name, args: queueKey{namespace: "test", name: "policy"},
+			fields: fields{i: &ingressLister{Items: []*networkingv1.Ingress{ingress}}, r: existingRoutes},
+		}
+		for ruleIndex, rule := range ingress.Spec.Rules {
+			for pathIndex, ingressPath := range rule.HTTP.Paths {
+				wantRoute := &routev1.Route{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "<generated>", Namespace: "test", Annotations: annotations,
+						OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "policy", Controller: &boolTrue}},
+					},
+					Spec: routev1.RouteSpec{
+						Host: rule.Host, Path: ingressPath.Path,
+						To:   routev1.RouteTargetReference{Kind: "Service", Name: "service-1"},
+						Port: &routev1.RoutePort{TargetPort: intstr.FromString("http")},
+					},
+				}
+				tlsJSON := ""
+				if !policyTest.nonTLS && (!policyTest.mixed || ruleIndex == 0) {
+					wantRoute.Spec.TLS = &routev1.TLSConfig{Termination: termination, InsecureEdgeTerminationPolicy: policyTest.wantPolicy}
+					tlsJSON = `,"tls":` + policyTest.wantTLSJSON
+					if policyTest.mixed {
+						wantRoute.Spec.TLS.Certificate = "cert"
+						wantRoute.Spec.TLS.Key = "key"
+					}
+				}
+				weightJSON := "null"
+				if policyTest.preserveAttributes {
+					wantRoute.Spec.To.Weight = ptr.To[int32](75)
+					wantRoute.Spec.TLS.DestinationCACertificate = "user-ca"
+					weightJSON = "75"
+				}
+				if policyTest.action == "create" {
+					policyCase.wantRouteCreates = append(policyCase.wantRouteCreates, wantRoute)
+					continue
+				}
+				wantRoute.Name = fmt.Sprintf("policy-route-%d-%d", ruleIndex, pathIndex)
+				existing := wantRoute.DeepCopy()
+				existing.Annotations = existingAnnotations
+				existing.Spec.WildcardPolicy = routev1.WildcardPolicyNone
+				if policyTest.existingTLS {
+					existing.Spec.TLS = &routev1.TLSConfig{Termination: termination}
+				}
+				if existing.Spec.TLS != nil {
+					existing.Spec.TLS.InsecureEdgeTerminationPolicy = policyTest.existingPolicy
+					if policyTest.existingTermination != "" {
+						existing.Spec.TLS.Termination = policyTest.existingTermination
+					}
+				}
+				if policyTest.changePort {
+					existing.Spec.Port.TargetPort = intstr.FromInt(80)
+					policyCase.expectedEvents = []string{`Normal IncompleteIngressToRouteRules Incomplete ingress to route rules detected: Target port of "service-1" backend service does not match route target port at index 0, path index 0`}
+				}
+				existingRoutes.Items = append(existingRoutes.Items, existing)
+				if policyTest.action == "patch" {
+					pathJSON := ""
+					if ingressPath.Path != "" {
+						pathJSON = fmt.Sprintf(`,"path":%q`, ingressPath.Path)
+					}
+					annotationsJSON, err := json.Marshal(annotations)
+					if err != nil {
+						t.Fatal(err)
+					}
+					policyCase.wantRoutePatches = append(policyCase.wantRoutePatches, clientgotesting.PatchActionImpl{
+						Name: wantRoute.Name,
+						Patch: []byte(fmt.Sprintf(
+							`[{"op":"replace","path":"/spec","value":{"host":%q%s,"to":{"kind":"Service","name":"service-1","weight":%s},"port":{"targetPort":"http"}%s}},{"op":"replace","path":"/metadata/annotations","value":%s},{"op":"replace","path":"/metadata/ownerReferences","value":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","name":"policy","uid":"","controller":true}]}]`,
+							rule.Host, pathJSON, weightJSON, tlsJSON, annotationsJSON,
+						)),
+					})
+				}
+			}
+		}
+		if policyTest.action == "create" {
+			policyCase.wantExpects = []queueKey{policyCase.args}
+		}
+		tests = append(tests, policyCase)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
