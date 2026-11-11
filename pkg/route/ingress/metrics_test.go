@@ -262,6 +262,47 @@ func TestMetrics(t *testing.T) {
 				"openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"acme.local\",name=\"owned-by-unmanaged\",namespace=\"test\"} 1",
 			},
 		},
+		{
+			name:               "Route whose Ingress owner does not exist should return 0",
+			ingressLister:      &ingressLister{},
+			ingressclassLister: &ingressclassLister{},
+			routeLister: &routeLister{
+				Items: []*routev1.Route{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "owned-by-missing",
+							Namespace:       "test",
+							OwnerReferences: []metav1.OwnerReference{{APIVersion: "networking.k8s.io/v1", Kind: "Ingress", Name: "missing", Controller: &boolTrue}},
+						},
+						Spec: routev1.RouteSpec{
+							Host: "missing.local",
+						},
+					},
+				},
+			},
+			expectedResponse: "openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"missing.local\",name=\"owned-by-missing\",namespace=\"test\"} 0",
+		},
+		{
+			name: "Route flagged unmanaged returns 0 after its Ingress owner is removed",
+			ingressLister: &ingressLister{
+				Items: []*networkingv1.Ingress{&unmanagedIngress},
+			},
+			ingressclassLister: &ingressclassLister{
+				Items: []*networkingv1.IngressClass{&unmanagedIngressClass},
+			},
+			routeLister: &routeLister{
+				Items: []*routev1.Route{unmanagedRoute("owner-removed.local")},
+			},
+			expectedResponse: "openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"owner-removed.local\",name=\"owned-by-unmanaged\",namespace=\"test\"} 1",
+			ingressLister2:   &ingressLister{},
+			ingressclassLister2: &ingressclassLister{
+				Items: []*networkingv1.IngressClass{&unmanagedIngressClass},
+			},
+			routeLister2: &routeLister{
+				Items: []*routev1.Route{unmanagedRoute("owner-removed.local")},
+			},
+			expectedResponses2: []string{"openshift_ingress_to_route_controller_route_with_unmanaged_owner{host=\"owner-removed.local\",name=\"owned-by-unmanaged\",namespace=\"test\"} 0"},
+		},
 	}
 
 	i := ingressLister{}
