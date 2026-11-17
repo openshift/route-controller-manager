@@ -3,6 +3,7 @@ package ingress
 import (
 	"bytes"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -288,7 +289,8 @@ func TestMetrics(t *testing.T) {
 			h := promhttp.HandlerFor(legacyregistry.DefaultGatherer, promhttp.HandlerOpts{ErrorHandling: promhttp.HTTPErrorOnError})
 
 			rw := &fakeResponseWriter{header: http.Header{}}
-			h.ServeHTTP(rw, &http.Request{})
+			req := &http.Request{URL: &url.URL{Path: "/metrics"}}
+			h.ServeHTTP(rw, req)
 
 			respStr := rw.String()
 			if !strings.Contains(respStr, tc.expectedResponse) {
@@ -301,7 +303,8 @@ func TestMetrics(t *testing.T) {
 				r.Items = tc.routeLister2.Items
 
 				rw := &fakeResponseWriter{header: http.Header{}}
-				h.ServeHTTP(rw, &http.Request{})
+				req := &http.Request{URL: &url.URL{Path: "/metrics"}}
+				h.ServeHTTP(rw, req)
 
 				respStr2 := rw.String()
 				for _, response := range tc.expectedResponses2 {
@@ -350,7 +353,8 @@ func Test_ResetIngressMetrics(t *testing.T) {
 		h := promhttp.HandlerFor(legacyregistry.DefaultGatherer, promhttp.HandlerOpts{ErrorHandling: promhttp.HTTPErrorOnError})
 
 		rw := &fakeResponseWriter{header: http.Header{}}
-		h.ServeHTTP(rw, &http.Request{})
+		req := &http.Request{URL: &url.URL{Path: "/metrics"}}
+		h.ServeHTTP(rw, req)
 
 		respStr := rw.String()
 		if !strings.Contains(respStr, expectedResponse) {
